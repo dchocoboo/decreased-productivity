@@ -43,11 +43,156 @@ const binary =
   const url = "http://127.0.0.1:" + server.address().port;
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "dp-firefox-test-"));
   fs.cpSync("dist/firefox", directory, { recursive: true });
-  const backgroundProbe = `\n(async()=>{let error;try{await queue;let config=await settings();await browser.storage.local.set({settings:{...config,newPages:'Uncloak'}});let tab=await browser.tabs.create({url:${JSON.stringify(url)}});async function state(){const result=await browser.scripting.executeScript({target:{tabId:tab.id},func:()=>{let image=document.querySelector('#important');return image?{opacity:getComputedStyle(image).opacity,display:getComputedStyle(image).display,background:getComputedStyle(document.documentElement).backgroundColor,heading:getComputedStyle(document.querySelector('h1')).color,paragraph:getComputedStyle(document.querySelector('p')).color}:null;}});return result[0].result;}async function wait(test){for(let i=0;i<100;i++){try{const value=await state();if(value&&test(value))return;}catch{}await new Promise(r=>setTimeout(r,100));}throw Error('Firefox DOM assertion timed out');}await wait(s=>s.opacity==='1');const original=await state();await serialized(()=>toggle(tab));await wait(s=>s.opacity==='0.05');await serialized(()=>toggle(tab,true));await wait(s=>s.display==='none');await serialized(()=>toggle(tab,true));await wait(s=>s.opacity==='0.05'&&s.display!=='none');config=await settings();await serialized(async()=>{await browser.storage.local.set({settings:{...config,customcss:'html { background: rgb(12, 34, 56) !important; } h1 { color: rgb(23, 45, 67) !important; } @media screen { html body p { color: rgb(34, 56, 78) !important; } }'}});await updateAll();});await wait(s=>s.background==='rgb(12, 34, 56)'&&s.heading==='rgb(23, 45, 67)'&&s.paragraph==='rgb(34, 56, 78)');await serialized(()=>toggle(tab));await wait(s=>s.opacity==='1'&&s.background===original.background&&s.heading===original.heading&&s.paragraph===original.paragraph);await serialized(()=>toggle(tab));await wait(s=>s.opacity==='0.05'&&s.background==='rgb(12, 34, 56)');await serialized(()=>changeDomain('127.0.0.1','whitelist'));await wait(s=>s.opacity==='1');await browser.tabs.create({url:browser.runtime.getURL('options.html?smoke')});}catch(e){error=e.stack;}await fetch(${JSON.stringify(url + "/report")},{method:'POST',body:JSON.stringify({kind:'background',error:error||null,version:navigator.userAgent})});})();`;
-  fs.appendFileSync(path.join(directory, "js/background.js"), backgroundProbe);
+  const backgroundProbe = async function (fixtureURL) {
+    let error, stage, permissions;
+    try {
+      await queue;
+      permissions = await browser.permissions.getAll();
+      let config = await settings();
+      await browser.storage.local.set({
+        settings: { ...config, newPages: "Uncloak" },
+      });
+      const tab = await browser.tabs.create({ url: fixtureURL });
+      async function state() {
+        const result = await browser.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: () => {
+            const image = document.querySelector("#important");
+            return image
+              ? {
+                  opacity: getComputedStyle(image).opacity,
+                  display: getComputedStyle(image).display,
+                  background: getComputedStyle(document.documentElement)
+                    .backgroundColor,
+                  heading: getComputedStyle(document.querySelector("h1")).color,
+                  paragraph: getComputedStyle(document.querySelector("p"))
+                    .color,
+                }
+              : null;
+          },
+        });
+        return result[0].result;
+      }
+      async function wait(name, test) {
+        stage = name;
+        let last, lastError;
+        for (let i = 0; i < 100; i++) {
+          try {
+            last = await state();
+            if (last && test(last)) return;
+          } catch (failure) {
+            lastError = failure.stack || String(failure);
+          }
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        throw Error(
+          name +
+            " timed out: " +
+            JSON.stringify({ last, lastError, permissions }),
+        );
+      }
+      await wait("Original page", (value) => value.opacity === "1");
+      const original = await state();
+      await serialized(() => toggle(tab));
+      await wait("USER CSS cloak", (value) => value.opacity === "0.05");
+      await serialized(() => toggle(tab, true));
+      await wait("Paranoid", (value) => value.display === "none");
+      await serialized(() => toggle(tab, true));
+      await wait(
+        "Paranoid restoration",
+        (value) => value.opacity === "0.05" && value.display !== "none",
+      );
+      config = await settings();
+      await serialized(async () => {
+        await browser.storage.local.set({
+          settings: {
+            ...config,
+            customcss:
+              "html { background: rgb(12, 34, 56) !important; } h1 { color: rgb(23, 45, 67) !important; } @media screen { html body p { color: rgb(34, 56, 78) !important; } }",
+          },
+        });
+        await updateAll();
+      });
+      await wait(
+        "Scoped custom root/descendant CSS",
+        (value) =>
+          value.background === "rgb(12, 34, 56)" &&
+          value.heading === "rgb(23, 45, 67)" &&
+          value.paragraph === "rgb(34, 56, 78)",
+      );
+      await serialized(() => toggle(tab));
+      await wait(
+        "Uncloak custom CSS restoration",
+        (value) =>
+          value.opacity === "1" &&
+          value.background === original.background &&
+          value.heading === original.heading &&
+          value.paragraph === original.paragraph,
+      );
+      await serialized(() => toggle(tab));
+      await wait(
+        "Recloak custom CSS",
+        (value) =>
+          value.opacity === "0.05" && value.background === "rgb(12, 34, 56)",
+      );
+      await serialized(() => changeDomain("127.0.0.1", "whitelist"));
+      await wait("Whitelist", (value) => value.opacity === "1");
+      await browser.tabs.create({
+        url: browser.runtime.getURL("options.html?smoke"),
+      });
+    } catch (failure) {
+      error = failure.stack;
+    }
+    await fetch(fixtureURL + "/report", {
+      method: "POST",
+      body: JSON.stringify({
+        kind: "background",
+        error: error || null,
+        stage,
+        permissions,
+        version: navigator.userAgent,
+      }),
+    });
+  };
+  const optionsProbe = async function (fixtureURL) {
+    let error;
+    try {
+      for (let i = 0; i < 100 && !current; i++)
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      if (!current) throw Error("Options failed to load");
+      const result = await request({
+        type: "save-settings",
+        patch: { opacity1: "0.33", font: "Calibri" },
+      });
+      if (result.settings.opacity1 !== "0.33")
+        throw Error("Options save failed");
+      render(result.settings);
+      document.querySelector("#showUnderline").click();
+      await saving;
+      if (
+        (await request({ type: "get-settings" })).settings.showUnderline !==
+        "false"
+      )
+        throw Error("Fractional settings blocked unrelated checkbox save");
+    } catch (failure) {
+      error = failure.stack;
+    }
+    await fetch(fixtureURL + "/report", {
+      method: "POST",
+      body: JSON.stringify({ kind: "options", error: error || null }),
+    });
+  };
+  fs.appendFileSync(
+    path.join(directory, "js/background.js"),
+    "\n(" + backgroundProbe.toString() + ")(" + JSON.stringify(url) + ");",
+  );
   fs.appendFileSync(
     path.join(directory, "js/options.js"),
-    `\nif(location.search==='?smoke') (async()=>{let error;try{for(let i=0;i<100&&!current;i++)await new Promise(r=>setTimeout(r,50));if(!current)throw Error('Options failed to load');let result=await request({type:'save-settings',patch:{opacity1:'0.33',font:'Calibri'}});if(result.settings.opacity1!=='0.33')throw Error('Options save failed');render(result.settings);document.querySelector('#showUnderline').click();await saving;if((await request({type:'get-settings'})).settings.showUnderline!=='false')throw Error('Fractional settings blocked unrelated checkbox save');}catch(e){error=e.stack;}await fetch(${JSON.stringify(url + "/report")},{method:'POST',body:JSON.stringify({kind:'options',error:error||null})});})();`,
+    "\nif(location.search==='?smoke') (" +
+      optionsProbe.toString() +
+      ")(" +
+      JSON.stringify(url) +
+      ");",
   );
   const child = spawn(
     process.execPath,
