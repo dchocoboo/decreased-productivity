@@ -12,10 +12,11 @@ jobs:
   browsers:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    env:
-      DP_EVIDENCE_DIR: ${{ runner.temp }}/decreased-productivity-evidence
-      DP_FIREFOX_LOG: ${{ runner.temp }}/decreased-productivity-firefox.log
     steps:
+      - name: Configure temporary evidence paths
+        run: |
+          echo "DP_EVIDENCE_DIR=$RUNNER_TEMP/decreased-productivity-evidence" >> "$GITHUB_ENV"
+          echo "DP_FIREFOX_LOG=$RUNNER_TEMP/decreased-productivity-firefox.log" >> "$GITHUB_ENV"
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-node@v7.0.0
         with:
