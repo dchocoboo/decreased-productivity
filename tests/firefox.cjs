@@ -44,7 +44,7 @@ const binary =
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "dp-firefox-test-"));
   fs.cpSync("dist/firefox", directory, { recursive: true });
   const backgroundProbe = async function (fixtureURL) {
-    let error, stage, permissions;
+    let error, stage, permissions, initialTabURL, currentTabURL;
     try {
       await queue;
       permissions = await browser.permissions.getAll();
@@ -53,6 +53,10 @@ const binary =
         settings: { ...config, newPages: "Uncloak" },
       });
       const tab = await browser.tabs.create({ url: fixtureURL });
+      initialTabURL = tab.url;
+      async function freshTab() {
+        return browser.tabs.get(tab.id);
+      }
       async function state() {
         const result = await browser.scripting.executeScript({
           target: { tabId: tab.id },
@@ -71,7 +75,9 @@ const binary =
               : null;
           },
         });
-        return result[0].result;
+        if (result[0]?.error) throw Error(String(result[0].error));
+        currentTabURL = (await browser.tabs.get(tab.id)).url;
+        return result[0]?.result;
       }
       async function wait(name, test) {
         stage = name;
@@ -81,7 +87,7 @@ const binary =
             last = await state();
             if (last && test(last)) return;
           } catch (failure) {
-            lastError = failure.stack || String(failure);
+            lastError = String(failure) + "\n" + (failure.stack || "");
           }
           await new Promise((resolve) => setTimeout(resolve, 100));
         }
@@ -93,11 +99,11 @@ const binary =
       }
       await wait("Original page", (value) => value.opacity === "1");
       const original = await state();
-      await serialized(() => toggle(tab));
+      await serialized(async () => toggle(await freshTab()));
       await wait("USER CSS cloak", (value) => value.opacity === "0.05");
-      await serialized(() => toggle(tab, true));
+      await serialized(async () => toggle(await freshTab(), true));
       await wait("Paranoid", (value) => value.display === "none");
-      await serialized(() => toggle(tab, true));
+      await serialized(async () => toggle(await freshTab(), true));
       await wait(
         "Paranoid restoration",
         (value) => value.opacity === "0.05" && value.display !== "none",
@@ -120,7 +126,7 @@ const binary =
           value.heading === "rgb(23, 45, 67)" &&
           value.paragraph === "rgb(34, 56, 78)",
       );
-      await serialized(() => toggle(tab));
+      await serialized(async () => toggle(await freshTab()));
       await wait(
         "Uncloak custom CSS restoration",
         (value) =>
@@ -129,7 +135,7 @@ const binary =
           value.heading === original.heading &&
           value.paragraph === original.paragraph,
       );
-      await serialized(() => toggle(tab));
+      await serialized(async () => toggle(await freshTab()));
       await wait(
         "Recloak custom CSS",
         (value) =>
@@ -141,7 +147,7 @@ const binary =
         url: browser.runtime.getURL("options.html?smoke"),
       });
     } catch (failure) {
-      error = failure.stack;
+      error = String(failure) + "\n" + (failure.stack || "");
     }
     await fetch(fixtureURL + "/report", {
       method: "POST",
@@ -150,6 +156,8 @@ const binary =
         error: error || null,
         stage,
         permissions,
+        initialTabURL,
+        currentTabURL,
         version: navigator.userAgent,
       }),
     });
@@ -175,7 +183,7 @@ const binary =
       )
         throw Error("Fractional settings blocked unrelated checkbox save");
     } catch (failure) {
-      error = failure.stack;
+      error = String(failure) + "\n" + (failure.stack || "");
     }
     await fetch(fixtureURL + "/report", {
       method: "POST",
