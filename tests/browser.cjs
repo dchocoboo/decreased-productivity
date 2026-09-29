@@ -425,6 +425,8 @@ const fixture = `<!doctype html><html><head><title>Original title</title><link r
     });
     await safe.waitForFunction(
       () =>
+        getComputedStyle(document.querySelector("#important")).opacity ===
+          "0.05" &&
         getComputedStyle(document.querySelector("h1")).color ===
           "rgb(255, 0, 0)" &&
         getComputedStyle(document.querySelector("h1")).fontSize === "24px" &&
@@ -447,6 +449,8 @@ const fixture = `<!doctype html><html><head><title>Original title</title><link r
     });
     await safe.waitForFunction(
       () =>
+        getComputedStyle(document.querySelector("#important")).opacity ===
+          "0.05" &&
         getComputedStyle(document.querySelector("h1")).color ===
           "rgb(20, 30, 40)" &&
         getComputedStyle(document.body).borderTopWidth === "3px",
@@ -454,8 +458,65 @@ const fixture = `<!doctype html><html><head><title>Original title</title><link r
     await patch({ customcss: "h1{color:rgb(40,30,20)!important}" });
     await safe.waitForFunction(
       () =>
+        getComputedStyle(document.querySelector("#important")).opacity ===
+          "0.05" &&
         getComputedStyle(document.querySelector("h1")).color ===
-        "rgb(40, 30, 20)",
+          "rgb(40, 30, 20)",
+    );
+    await safe.evaluate(() => {
+      document.querySelector("p").setAttribute("data-test", "a,b");
+    });
+    await patch({
+      customcss:
+        '@font-face{font-family:DPTest;src:local(Arial)} @keyframes dp-test{from{transform:none}to{transform:translateX(1px)}} html:before{content:"root"!important;color:rgb(1,2,3)!important} p::selection{color:rgb(3,4,5)!important} h1 { &::after { content:"nested"!important } } [data-test="a,b"],:is(h1,p){border-bottom:5px solid rgb(5,6,7)!important} p{animation:dp-test 10s linear infinite!important}',
+    });
+    await safe.waitForFunction(() => {
+      const p = document.querySelector("p"),
+        h1 = document.querySelector("h1");
+      return (
+        getComputedStyle(document.querySelector("#important")).opacity ===
+          "0.05" &&
+        getComputedStyle(document.documentElement, "::before").content ===
+          '"root"' &&
+        getComputedStyle(h1, "::after").content === '"nested"' &&
+        getComputedStyle(p, "::selection").color === "rgb(3, 4, 5)" &&
+        getComputedStyle(p).borderBottomWidth === "5px" &&
+        getComputedStyle(p).animationName === "dp-test"
+      );
+    });
+    assert.equal(
+      await safe.evaluate(() =>
+        [...document.querySelectorAll("style")].some(
+          (style) =>
+            style.textContent.includes("@font-face") &&
+            style.textContent.includes("@keyframes"),
+        ),
+      ),
+      true,
+    );
+    await safe.keyboard.press("Control+F12");
+    await safe.waitForFunction(
+      () =>
+        getComputedStyle(document.querySelector("p")).animationName ===
+          "none" &&
+        getComputedStyle(document.querySelector("h1"), "::after").content ===
+          "none",
+    );
+    assert.equal(
+      await safe.evaluate(() =>
+        [...document.querySelectorAll("style")].some((style) =>
+          style.textContent.includes("@font-face"),
+        ),
+      ),
+      false,
+    );
+    await safe.keyboard.press("Control+F12");
+    await safe.waitForFunction(
+      () =>
+        getComputedStyle(document.querySelector("#important")).opacity ===
+          "0.05" &&
+        getComputedStyle(document.documentElement, "::before").content ===
+          '"root"',
     );
     await patch({ customcss: "" });
     // The same shortcut in a cross-origin frame toggles the top-level tab exactly once.

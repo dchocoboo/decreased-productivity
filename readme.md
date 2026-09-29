@@ -6,7 +6,7 @@ This source version is **1.0.0** and uses Manifest V3. The old store listings ar
 
 ## Install locally
 
-Node.js 22 or later is needed for development and packaging; the extension itself has no runtime dependencies.
+Node.js 22 or later is needed for development and packaging; the extension bundles the local CSS Tree 3.2.1 parser and its license. It loads no library from a CDN.
 
 ```sh
 npm ci
@@ -53,16 +53,16 @@ The [Browser checks workflow](https://github.com/dchocoboo/decreased-productivit
 
 The Firefox harness uses a disposable source copy with test-only probes and a separate profile. Set `FIREFOX_BINARY=/path/to/firefox npm run test:firefox` on other systems. Set `DP_FIREFOX_HEADED=1 npm run test:firefox` to use an ordinary visible Firefox window instead of headless mode. Set `DP_FIREFOX_VERBOSE=1` for live launch diagnostics, or `DP_FIREFOX_LOG=/private/tmp/dp-firefox.log` to preserve the full runner log outside the repository. The harness reports the launch mode and binary, uses a separate profile, and closes only its test process. Test probes are never included in build outputs.
 
-Verified on 2026-09-29: comprehensive real bundled Chromium **153.0.8010.12** suite, **8/8** pure unit regressions, desktop 1280×900 and mobile 390×844 Options UI, Mozilla lint with zero warnings/errors and npm audit with zero vulnerabilities. Personal Chrome and Edge profiles were not changed. Firefox runtime validation was attempted with installed Firefox **148.0** and bundled Firefox **155.0** in headless mode. A separate supported headed run with installed Firefox **148.0** also failed before add-on installation on this ARM64 macOS **27.0 (26A428)** host: the debugger port never opened (`ECONNREFUSED`), and the full runner log reported `sandbox_extension_issue_file_to_process ... Operation not permitted` plus Firefox GPU Helper `_LSModifyNotification` and `Connection invalid` errors. No extension assertion ran during these launch failures. The Firefox package is lint-validated; actual Firefox extension behavior remains unverified on this host. Safari and Android were not tested.
+Verified on 2026-09-29: comprehensive real bundled Chromium **153.0.8010.12** suite, **10/10** pure unit regressions, desktop 1280×900 and mobile 390×844 Options UI, Mozilla lint with zero warnings/errors and npm audit with zero vulnerabilities. Personal Chrome and Edge profiles were not changed. Firefox runtime validation was attempted with installed Firefox **148.0** and bundled Firefox **155.0** in headless mode. A separate supported headed run with installed Firefox **148.0** also failed before add-on installation on this ARM64 macOS **27.0 (26A428)** host: the debugger port never opened (`ECONNREFUSED`), and the full runner log reported `sandbox_extension_issue_file_to_process ... Operation not permitted` plus Firefox GPU Helper `_LSModifyNotification` and `Connection invalid` errors. No extension assertion ran during these launch failures. The Firefox package is lint-validated; actual Firefox extension behavior remains unverified on this host. Safari and Android were not tested.
 
 [Mozilla bug 2072342](https://bugzilla.mozilla.org/show_bug.cgi?id=2072342) reports the same sandbox/GPU launch errors from a shell on ARM64 macOS 27, using Firefox 156. That report remains **UNCONFIRMED** and is a possible related host issue, not a proven diagnosis of these Firefox 148/155 failures. The test harness does not disable browser sandboxing or alter personal profiles/system configuration. Re-run the headed harness on a working Firefox host to complete runtime verification.
 
-Custom CSS is appended after built-in rules at the same stylesheet origin, so specific `!important` custom rules can override cloak defaults. Ordinary style rules are scoped to the active configuration. CSS global declarations such as font-face and keyframe names retain browser-defined global behavior; fetched resources cannot be “unloaded” after use.
+Custom CSS is appended after built-in rules at the same stylesheet origin, so specific `!important` custom rules can override cloak defaults. CSS Tree parses every ordinary selector and adds a zero-specificity gate for the active configuration to its subject, preserving root/ancestor selectors, selector lists, nesting and pseudo-elements. Grouped rules (such as media, supports and layers) keep those gates; layer order and sheet-local namespace mappings are retained. Imports, global definitions (such as font-face, keyframes, properties and page rules), and unknown at-rules stay only in the removable AUTHOR stylesheet. Unsupported selector syntax is skipped from the stronger USER copy with a console warning; malformed custom CSS cannot disable the built-in cloak. The original custom CSS remains in the removable AUTHOR stylesheet, including open shadow roots. Fetched resources cannot be “unloaded” after use.
 
 ## Browser API references
 
 - [Chrome Manifest V3 service-worker migration](https://developer.chrome.com/docs/extensions/develop/migrate/to-service-workers)
-- [Mozilla Firefox 146 CSS scope support](https://developer.mozilla.org/en-US/docs/Mozilla/Firefox/Releases/146)
+- [CSS Tree parser and browser bundle](https://github.com/csstree/csstree)
 - [Chrome storage API](https://developer.chrome.com/docs/extensions/reference/api/storage)
 - [Mozilla background manifest differences](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/background)
 - [Playwright Chrome extensions: use bundled Chromium](https://playwright.dev/docs/chrome-extensions)

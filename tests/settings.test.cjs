@@ -111,10 +111,38 @@ test("legacy shortcut punctuation and aliases survive validation", () => {
   );
 });
 
-test("scoped USER sheets isolate exact generations and preserve custom rules", () => {
+test("gated USER sheets isolate exact generations and preserve custom specificity", () => {
   const config = settings.validate({ customcss: "h1{color:red!important}" }),
     next = { ...config, sfwmode: "Paranoid" };
   assert.notEqual(style.signature(config), style.signature(next));
-  assert.match(style.css(config, false, true), /^@scope/);
-  assert.match(style.css(config, false, true), /h1\{color:red!important\}/);
+  assert.doesNotMatch(style.css(config, false, true), /@scope/);
+  assert.match(
+    style.css(config, false, true),
+    /h1:where\(:root\[data-dp-cloaked=/,
+  );
+  assert.match(style.css(config, false, true), /\{color:red!important\}/);
+});
+
+test("parsed gates preserve root ancestry, lists, functional commas and pseudo-elements", () => {
+  const output = style.gatedCSS(
+    'html body p::before,:root > body,:is(html,[data-x="a,b"]):before { content:"test"; } @media screen { p::selection { color:red!important } } @supports(display:grid) { h1 { &::after { content:"nested" } } }',
+    "abc",
+  );
+  assert.match(output, /html body p:where\([^{}]+\)::before/);
+  assert.match(output, /:root>body:where\(/);
+  assert.match(output, /:is\(html,\[data-x="a,b"\]\):where\([^{}]+\):before/);
+  assert.match(output, /p:where\([^{}]+\)::selection/);
+  assert.match(output, /&:where\([^{}]+\)::after/);
+});
+test("USER copy excludes global definitions and skips raw invalid selectors", () => {
+  const config = settings.validate({
+    customcss:
+      '@font-face{font-family:Demo;src:local(Arial)} @keyframes spin{to{opacity:0}} @property --demo{syntax:"<color>";inherits:false;initial-value:red} @layer priority; @layer priority { h1{color:red!important} } ???{color:blue!important}',
+  });
+  const output = style.css(config, false, true);
+  assert.doesNotMatch(output, /@font-face|@keyframes|@property|\?\?\?/);
+  assert.match(output, /@layer priority;/);
+  assert.match(output, /@layer priority\{h1:where/);
+  assert.match(style.css(config), /@font-face/);
+  assert.match(output, /opacity:0.05!important/);
 });

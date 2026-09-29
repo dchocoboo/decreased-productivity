@@ -16,11 +16,24 @@ for (const browser of ["chromium", "firefox"]) {
     "migration.html",
   ])
     fs.cpSync(name, path.join(output, name), { recursive: true });
+  fs.copyFileSync(
+    "node_modules/css-tree/dist/csstree.js",
+    path.join(output, "js/csstree.js"),
+  );
+  fs.copyFileSync(
+    "node_modules/css-tree/LICENSE",
+    path.join(output, "js/csstree.LICENSE"),
+  );
   const target = structuredClone(manifest);
   if (browser === "firefox") {
     delete target.minimum_chrome_version;
     target.background = {
-      scripts: ["js/settings.js", "js/style.js", "js/background.js"],
+      scripts: [
+        "js/csstree.js",
+        "js/settings.js",
+        "js/style.js",
+        "js/background.js",
+      ],
     };
     target.permissions = target.permissions.filter(
       (name) => name !== "offscreen",

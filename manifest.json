@@ -27,7 +27,7 @@
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["js/settings.js", "js/style.js", "js/dp.js"],
+      "js": ["js/csstree.js", "js/settings.js", "js/style.js", "js/dp.js"],
       "all_frames": true,
       "match_about_blank": true,
       "run_at": "document_start"

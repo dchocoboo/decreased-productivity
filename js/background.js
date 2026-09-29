@@ -1,7 +1,7 @@
 /* Event listeners are registered synchronously; durable storage is the source of truth. */
 "use strict";
 if (typeof importScripts === "function")
-  importScripts("settings.js", "style.js");
+  importScripts("csstree.js", "settings.js", "style.js");
 const extension = globalThis.browser || chrome;
 let queue = Promise.resolve();
 function serialized(task) {
@@ -359,7 +359,12 @@ extension.runtime.onInstalled.addListener((details) => {
           extension.scripting
             .executeScript({
               target: { tabId: tab.id, allFrames: true },
-              files: ["js/settings.js", "js/style.js", "js/dp.js"],
+              files: [
+                "js/csstree.js",
+                "js/settings.js",
+                "js/style.js",
+                "js/dp.js",
+              ],
             })
             .catch(() => {}),
         ),

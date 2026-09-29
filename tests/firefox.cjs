@@ -35,7 +35,7 @@ const binary =
     } else {
       res.writeHead(200, { "Content-Type": "text/html" });
       res.end(
-        '<!doctype html><html><head><title>Firefox fixture</title></head><body><h1>Firefox fixture</h1><p>Scoped text</p><img id="important" src="/image.png" style="opacity:1!important;display:block!important;width:128px;height:128px"></body></html>',
+        '<!doctype html><html><head><title>Firefox fixture</title></head><body><h1>Firefox fixture</h1><p class="note" data-test="a,b">Custom text</p><img id="important" src="/image.png" style="opacity:1!important;display:block!important;width:128px;height:128px"></body></html>',
       );
     }
   });
@@ -64,6 +64,12 @@ const binary =
             const image = document.querySelector("#important");
             return image
               ? {
+                  gate: document.documentElement.getAttribute(
+                    "data-dp-cloaked",
+                  ),
+                  authorSheets: [...document.querySelectorAll("style")].map(
+                    (style) => ({ id: style.id, text: style.textContent }),
+                  ),
                   opacity: getComputedStyle(image).opacity,
                   display: getComputedStyle(image).display,
                   background: getComputedStyle(document.documentElement)
@@ -91,11 +97,18 @@ const binary =
           }
           await new Promise((resolve) => setTimeout(resolve, 100));
         }
-        throw Error(
-          name +
-            " timed out: " +
-            JSON.stringify({ last, lastError, permissions }),
-        );
+        const diagnostic = {
+          last,
+          lastError,
+          permissions,
+          initialTabURL,
+          currentTabURL,
+          currentSettings: await settings(),
+          expectedSignature: DPStyle.signature(await settings(), false),
+          currentResponse: await response(await freshTab()),
+          storedCSS: (await browser.storage.session.get("css")).css,
+        };
+        throw Error(name + " timed out: " + JSON.stringify(diagnostic));
       }
       await wait("Original page", (value) => value.opacity === "1");
       const original = await state();
@@ -113,18 +126,39 @@ const binary =
         await browser.storage.local.set({
           settings: {
             ...config,
-            customcss:
-              "html { background: rgb(12, 34, 56) !important; } h1 { color: rgb(23, 45, 67) !important; } @media screen { html body p { color: rgb(34, 56, 78) !important; } }",
+            customcss: `@font-face { font-family: DPTest; src: local(Arial); }
+              @keyframes dp-test { from { transform:none; } to { transform:translateX(1px); } }
+              html { background:rgb(12,34,56)!important; }
+              html:before { content:"root"!important; }
+              :root { color:rgb(45,67,89)!important; }
+              h1 { color:rgb(23,45,67)!important; &::after { content:"nested"!important; } }
+              p::selection { color:rgb(56,78,90)!important; }
+              @media screen { html body p { color:rgb(34,56,78)!important; } }
+              @supports(display:grid) { :root > body { border-top:3px solid red!important; } }
+              [data-test="a,b"],:is(h1,p) { border-bottom:5px solid rgb(5,6,7)!important; }
+              p,#missing { outline-color:rgb(1,2,3)!important; }
+              p.note { outline-color:rgb(2,3,4)!important; }
+              p { animation:dp-test 10s linear infinite!important; }`,
           },
         });
         await updateAll();
       });
       await wait(
-        "Scoped custom root/descendant CSS",
+        "Gated custom root/descendant and nested CSS",
         (value) =>
+          value.opacity === "0.05" &&
           value.background === "rgb(12, 34, 56)" &&
           value.heading === "rgb(23, 45, 67)" &&
-          value.paragraph === "rgb(34, 56, 78)",
+          value.paragraph === "rgb(34, 56, 78)" &&
+          value.rootColor === "rgb(45, 67, 89)" &&
+          value.bodyBorder === "3px" &&
+          value.headingAfter === '"nested"' &&
+          value.selectionColor === "rgb(56, 78, 90)" &&
+          value.rootBefore === '"root"' &&
+          value.paragraphBorder === "5px" &&
+          value.outlineColor === "rgb(2, 3, 4)" &&
+          value.animationName === "dp-test" &&
+          value.globalDefinitions,
       );
       await serialized(async () => toggle(await freshTab()));
       await wait(
@@ -133,13 +167,31 @@ const binary =
           value.opacity === "1" &&
           value.background === original.background &&
           value.heading === original.heading &&
-          value.paragraph === original.paragraph,
+          value.paragraph === original.paragraph &&
+          value.rootColor === original.rootColor &&
+          value.bodyBorder === original.bodyBorder &&
+          value.headingAfter === original.headingAfter &&
+          value.rootBefore === original.rootBefore &&
+          value.animationName === original.animationName &&
+          !value.globalDefinitions,
       );
       await serialized(async () => toggle(await freshTab()));
       await wait(
         "Recloak custom CSS",
         (value) =>
-          value.opacity === "0.05" && value.background === "rgb(12, 34, 56)",
+          value.opacity === "0.05" &&
+          value.background === "rgb(12, 34, 56)" &&
+          value.heading === "rgb(23, 45, 67)" &&
+          value.paragraph === "rgb(34, 56, 78)" &&
+          value.rootColor === "rgb(45, 67, 89)" &&
+          value.bodyBorder === "3px" &&
+          value.headingAfter === '"nested"' &&
+          value.selectionColor === "rgb(56, 78, 90)" &&
+          value.rootBefore === '"root"' &&
+          value.paragraphBorder === "5px" &&
+          value.outlineColor === "rgb(2, 3, 4)" &&
+          value.animationName === "dp-test" &&
+          value.globalDefinitions,
       );
       await serialized(() => changeDomain("127.0.0.1", "whitelist"));
       await wait("Whitelist", (value) => value.opacity === "1");
@@ -272,7 +324,7 @@ const binary =
     for (const report of Object.values(reports))
       if (report.error) throw Error(report.error);
     console.log(
-      "PASS actual Firefox extension background, USER CSS/custom scoped root restoration, Paranoid restore, whitelist and options/fractional save.",
+      "PASS actual Firefox extension background, USER CSS/custom parsed root and pseudo restoration, Paranoid restore, whitelist and options/fractional save.",
     );
   } finally {
     clearTimeout(timeout);
