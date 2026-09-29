@@ -70,6 +70,33 @@ const binary =
                   authorSheets: [...document.querySelectorAll("style")].map(
                     (style) => ({ id: style.id, text: style.textContent }),
                   ),
+                  rootBefore: getComputedStyle(
+                    document.documentElement,
+                    "::before",
+                  ).content,
+                  paragraphBorder: getComputedStyle(document.querySelector("p"))
+                    .borderBottomWidth,
+                  outlineColor: getComputedStyle(document.querySelector("p"))
+                    .outlineColor,
+                  animationName: getComputedStyle(document.querySelector("p"))
+                    .animationName,
+                  globalDefinitions: [
+                    ...document.querySelectorAll("style"),
+                  ].some(
+                    (style) =>
+                      style.textContent.includes("@font-face") &&
+                      style.textContent.includes("@keyframes"),
+                  ),
+                  rootColor: getComputedStyle(document.documentElement).color,
+                  bodyBorder: getComputedStyle(document.body).borderTopWidth,
+                  headingAfter: getComputedStyle(
+                    document.querySelector("h1"),
+                    "::after",
+                  ).content,
+                  selectionColor: getComputedStyle(
+                    document.querySelector("p"),
+                    "::selection",
+                  ).color,
                   opacity: getComputedStyle(image).opacity,
                   display: getComputedStyle(image).display,
                   background: getComputedStyle(document.documentElement)
