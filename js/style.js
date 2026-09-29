@@ -1,6 +1,14 @@
 (() => {
   "use strict";
   const visible = "__dp_small_image";
+  function signature(config, paranoid = false) {
+    let hash = 2166136261;
+    for (const char of JSON.stringify([config, paranoid])) {
+      hash ^= char.charCodeAt(0);
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(16);
+  }
   function css(config, paranoid = false, userOrigin = false) {
     const font =
       config.font === "-Custom-" ? config.customfont || "Arial" : config.font;
@@ -11,7 +19,7 @@
       font === "-Unchanged-"
         ? ""
         : `font-family:${face}!important;font-size:${config.fontsize}px!important;`;
-    const all = ":root,:host,*",
+    const all = ":where(:scope,:root,:host,*)",
       images = 'img,canvas,input[type="image"],svg,image',
       media = "video,audio,object,embed";
     let text = `${all}{background-color:#${config.s_bg}!important;background-image:none!important;color:#${config.s_text}!important;border-color:#${config.s_table}!important;box-shadow:none!important;text-shadow:none!important;${fontRule}${config.removeBold === "true" ? "font-weight:normal!important;" : ""}}\n`;
@@ -30,22 +38,18 @@
     }
     text += `img.${visible}{display:initial!important;visibility:visible!important;opacity:1!important;}\n`;
     if (userOrigin) {
-      // Gate USER sheets so a stylesheet revived from browser history is inert immediately on uncloak.
-      return text.replace(/([^{}]+)\{/g, (_, selectors) => {
-        selectors = selectors.trim();
-        const scope = ":root[data-dp-cloaked]";
-        if (selectors === all) return scope + "," + scope + " *{";
-        if (selectors.includes(":is(")) return scope + " " + selectors + "{";
-        return (
-          selectors
-            .split(",")
-            .map((selector) => scope + " " + selector.trim())
-            .join(",") + "{"
-        );
-      });
+      // All ordinary rules share a scope, preserving custom selector specificity and source order.
+      return (
+        '@scope (:root[data-dp-cloaked="' +
+        signature(config, paranoid) +
+        '"]) {\n' +
+        text +
+        config.customcss +
+        "\n}"
+      );
     }
     return text + config.customcss;
   }
-  globalThis.DPStyle = { css };
-  if (typeof module !== "undefined") module.exports = { css };
+  globalThis.DPStyle = { css, signature };
+  if (typeof module !== "undefined") module.exports = { css, signature };
 })();

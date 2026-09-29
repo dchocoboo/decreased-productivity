@@ -12,8 +12,11 @@ const binary =
   execFileSync(process.execPath, ["scripts/build.cjs"]);
   const image = fs.readFileSync("img/icon128.png");
   const reports = {};
-  let resolveReports;
-  const done = new Promise((resolve) => (resolveReports = resolve));
+  let resolveReports, rejectReports;
+  const done = new Promise((resolve, reject) => {
+    resolveReports = resolve;
+    rejectReports = reject;
+  });
   const server = http.createServer((req, res) => {
     if (req.url.startsWith("/report")) {
       let body = "";
@@ -23,7 +26,8 @@ const binary =
         reports[report.kind] = report;
         res.end("ok");
         console.log("Firefox", report);
-        if (reports.background && reports.options) resolveReports();
+        if (report.error) rejectReports(new Error(report.error));
+        else if (reports.background && reports.options) resolveReports();
       });
     } else if (req.url === "/image.png") {
       res.writeHead(200, { "Content-Type": "image/png" });
@@ -71,13 +75,37 @@ const binary =
     output += chunk;
     if (process.env.DP_FIREFOX_VERBOSE) process.stderr.write(chunk);
   });
+  child.once("error", rejectReports);
+  child.once("exit", (code, signal) => {
+    if (code !== 0)
+      rejectReports(
+        new Error(
+          "Firefox runner exited " +
+            code +
+            " " +
+            signal +
+            "\n" +
+            output.slice(0, 3500) +
+            "\n" +
+            output.slice(-2500),
+        ),
+      );
+  });
   let timeout;
   try {
     await Promise.race([
       done,
       new Promise((_, reject) => {
         timeout = setTimeout(
-          () => reject(Error("Firefox runtime timeout\n" + output)),
+          () =>
+            reject(
+              Error(
+                "Firefox runtime timeout\n" +
+                  output.slice(0, 3500) +
+                  "\n" +
+                  output.slice(-2500),
+              ),
+            ),
           45000,
         );
       }),

@@ -80,6 +80,7 @@ const fixture = `<!doctype html><html><head><title>Original title</title><link r
       page.locator("#important").evaluate((el) => getComputedStyle(el).opacity);
     console.log("Initial page loaded");
     assert.equal(await opacity(), "1");
+    await page.screenshot({ path: path.join(evidence, "before-page.png") });
     // Exercise real settings controls and background authorization, then toolbar-equivalent toggle.
     await options.locator("#newPages").selectOption("Cloak");
     await options.getByText("Settings saved.", { exact: true }).waitFor();
@@ -226,11 +227,10 @@ const fixture = `<!doctype html><html><head><title>Original title</title><link r
         "0.05",
     );
     await patch({ newPages: "Uncloak" });
-    assert.equal(
-      await created
-        .locator("#important")
-        .evaluate((el) => getComputedStyle(el).opacity),
-      "0.05",
+    await created.waitForFunction(
+      () =>
+        getComputedStyle(document.querySelector("#important")).opacity ===
+        "0.05",
     );
     const future = await context.newPage();
     await future.goto(url + "/future");
@@ -395,7 +395,85 @@ const fixture = `<!doctype html><html><head><title>Original title</title><link r
       () =>
         getComputedStyle(document.body).backgroundColor === "rgb(200, 50, 50)",
     );
+    await safe.keyboard.press("Control+F12");
+    await safe.waitForFunction(
+      () =>
+        getComputedStyle(document.querySelector("#important")).opacity ===
+        "0.05",
+    );
+    await patch({ sfwmode: "Paranoid" });
+    await safe.goto(url + "/paranoid-a");
+    await safe.waitForFunction(
+      () =>
+        getComputedStyle(document.querySelector("#important")).display ===
+        "none",
+    );
+    await safe.goto(url + "/paranoid-b");
+    await patch({ sfwmode: "SFW" });
+    await safe.goBack();
+    await safe.waitForFunction(
+      () =>
+        getComputedStyle(document.querySelector("#important")).display !==
+          "none" &&
+        getComputedStyle(document.querySelector("#important")).opacity ===
+          "0.05",
+    );
     await patch({ s_bg: "FFFFFF" });
+    await patch({
+      customcss:
+        "h1{font-size:24px!important;color:red!important} html{background-color:rgb(1,2,3)!important} :root{color:rgb(4,5,6)!important} @media(min-width:1px){html body p{font-weight:bold!important}}",
+    });
+    await safe.waitForFunction(
+      () =>
+        getComputedStyle(document.querySelector("h1")).color ===
+          "rgb(255, 0, 0)" &&
+        getComputedStyle(document.querySelector("h1")).fontSize === "24px" &&
+        getComputedStyle(document.documentElement).backgroundColor ===
+          "rgb(1, 2, 3)" &&
+        getComputedStyle(document.documentElement).color === "rgb(4, 5, 6)" &&
+        getComputedStyle(document.querySelector("p")).fontWeight === "700",
+    );
+    await safe.keyboard.press("Control+F12");
+    await safe.waitForFunction(
+      () =>
+        getComputedStyle(document.querySelector("h1")).color !==
+        "rgb(255, 0, 0)",
+    );
+    await patch({ customcss: "" });
+    await safe.keyboard.press("Control+F12");
+    await patch({
+      customcss:
+        "@supports(display:grid){:root > body{border-top:3px solid rgb(1,2,3)!important}} h1,p:is(p){color:rgb(20,30,40)!important}",
+    });
+    await safe.waitForFunction(
+      () =>
+        getComputedStyle(document.querySelector("h1")).color ===
+          "rgb(20, 30, 40)" &&
+        getComputedStyle(document.body).borderTopWidth === "3px",
+    );
+    await patch({ customcss: "h1{color:rgb(40,30,20)!important}" });
+    await safe.waitForFunction(
+      () =>
+        getComputedStyle(document.querySelector("h1")).color ===
+        "rgb(40, 30, 20)",
+    );
+    await patch({ customcss: "" });
+    // The same shortcut in a cross-origin frame toggles the top-level tab exactly once.
+    await page.locator("iframe").evaluate((el) => (el.style.opacity = "1"));
+    await page
+      .frames()
+      .find((frame) => frame.url().includes("/frame"))
+      .locator("body")
+      .click();
+    await page.keyboard.press("Control+F12");
+    await page.waitForFunction(
+      () =>
+        getComputedStyle(document.querySelector("#important")).opacity === "1",
+    );
+    await page.locator("#editor").focus();
+    await page.keyboard.press("Control+F12");
+    await page.waitForTimeout(100);
+    assert.equal(await opacity(), "1", "shortcuts skip editable controls");
     // Ordinary insecure HTTP must initialize without secure-context-only randomUUID.
     const insecure = await context.newPage();
     await insecure.goto("http://dp.test:" + server.address().port + "/http");

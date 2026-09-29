@@ -126,7 +126,10 @@
       document.documentElement &&
       !document.documentElement.hasAttribute("data-dp-cloaked")
     )
-      document.documentElement.setAttribute("data-dp-cloaked", "");
+      document.documentElement.setAttribute(
+        "data-dp-cloaked",
+        DPStyle.signature(config, paranoid),
+      );
     walk(document);
     metadata();
   }
@@ -159,7 +162,10 @@
     active = Boolean(payload.enabled);
     paranoid = Boolean(payload.paranoid);
     if (active) {
-      document.documentElement?.setAttribute("data-dp-cloaked", "");
+      document.documentElement?.setAttribute(
+        "data-dp-cloaked",
+        DPStyle.signature(config, paranoid),
+      );
       observe(document);
       refresh();
     }

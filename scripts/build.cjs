@@ -28,7 +28,7 @@ for (const browser of ["chromium", "firefox"]) {
     target.browser_specific_settings = {
       gecko: {
         id: "decreased-productivity@dchocoboo.github.io",
-        strict_min_version: "142.0",
+        strict_min_version: "146.0",
         data_collection_permissions: { required: ["none"] },
       },
     };

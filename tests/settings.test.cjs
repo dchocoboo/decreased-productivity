@@ -110,3 +110,11 @@ test("legacy shortcut punctuation and aliases survive validation", () => {
     true,
   );
 });
+
+test("scoped USER sheets isolate exact generations and preserve custom rules", () => {
+  const config = settings.validate({ customcss: "h1{color:red!important}" }),
+    next = { ...config, sfwmode: "Paranoid" };
+  assert.notEqual(style.signature(config), style.signature(next));
+  assert.match(style.css(config, false, true), /^@scope/);
+  assert.match(style.css(config, false, true), /h1\{color:red!important\}/);
+});
