@@ -1,0 +1,47 @@
+name: Browser checks
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browsers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      DP_EVIDENCE_DIR: ${{ runner.temp }}/decreased-productivity-evidence
+      DP_FIREFOX_LOG: ${{ runner.temp }}/decreased-productivity-firefox.log
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium firefox
+      - run: npm test
+      - run: npm run format:check && npx prettier --check .github/workflows/browser-checks.yml
+      - run: npm run test:browser
+      - name: Actual Firefox extension smoke test
+        run: FIREFOX_BINARY="$(node -p "require('playwright').firefox.executablePath()")" npm run test:firefox
+      - run: npm run package
+      - run: npm run lint:firefox
+      - run: npm audit
+      - name: Browser evidence and Firefox launch log
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: browser-evidence
+          path: |
+            ${{ runner.temp }}/decreased-productivity-evidence
+            ${{ runner.temp }}/decreased-productivity-firefox.log
+          if-no-files-found: ignore
+      - name: Browser packages
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: browser-packages
+          path: dist/*.zip
