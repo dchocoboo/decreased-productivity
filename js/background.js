@@ -1,457 +1,377 @@
-// (c) Andrew
-// Icon by dunedhel: http://dunedhel.deviantart.com/
-// Supporting functions by AdThwart - T. Joseph
-
-//'use strict'; - enable after testing
-var version = (function () {
-	var xhr = new XMLHttpRequest();
-	xhr.open('GET', chrome.extension.getURL('manifest.json'), false);
-	xhr.send(null);
-	return JSON.parse(xhr.responseText).version;
-}());
-var cloakedTabs = [];
-var uncloakedTabs = [];
-var contextLoaded = false;
-var dpicon, dptitle;
-var blackList, whiteList;
-
-// ----- Supporting Functions
-
-function enabled(tab, dpcloakindex) {
-	var dpdomaincheck = domainCheck(extractDomainFromURL(tab.url));
-	var dpcloakindex = dpcloakindex || cloakedTabs.indexOf(tab.windowId+"|"+tab.id);
-	if ((localStorage["enable"] == "true" || dpdomaincheck == '1') && dpdomaincheck != '0' && (localStorage["global"] == "true" || (localStorage["global"] == "false" && (dpcloakindex != -1 || localStorage["newPages"] == "Cloak" || dpdomaincheck == '1')))) return 'true';
-	return 'false';
+/* Event listeners are registered synchronously; durable storage is the source of truth. */
+"use strict";
+if (typeof importScripts === "function")
+  importScripts("settings.js", "style.js");
+const extension = globalThis.browser || chrome;
+let queue = Promise.resolve();
+function serialized(task) {
+  const result = queue.then(task);
+  queue = result.catch(console.error);
+  return result;
 }
-function domainCheck(domain) {
-	if (!domain) return '-1';
-	if (in_array(domain, whiteList) == '1') return '0';
-	if (in_array(domain, blackList) == '1') return '1';
-	return '-1';
+let initialization;
+async function initialize() {
+  if (!initialization)
+    initialization = (async () => {
+      const stored = await extension.storage.local.get("settings");
+      if (stored.settings) return;
+      let legacy = {};
+      if (typeof localStorage !== "undefined") legacy = { ...localStorage };
+      else if (extension.offscreen) {
+        try {
+          if (!(await extension.offscreen.hasDocument()))
+            await extension.offscreen.createDocument({
+              url: "migration.html",
+              reasons: ["LOCAL_STORAGE"],
+              justification:
+                "Preserve existing Decreased Productivity settings when upgrading to Manifest V3.",
+            });
+          legacy = await extension.runtime.sendMessage({
+            type: "read-legacy-storage",
+            target: "migration",
+          });
+        } finally {
+          if (await extension.offscreen.hasDocument())
+            await extension.offscreen.closeDocument();
+        }
+      }
+      await extension.storage.local.set({
+        settings: DPSettings.validate(legacy),
+      });
+    })().catch((error) => {
+      initialization = undefined;
+      throw error;
+    });
+  return initialization;
 }
-function in_array(needle, haystack) {
-	if (!haystack || !needle) return false;
-	if (binarySearch(haystack, needle) != -1) return '1';
-	if (needle.indexOf('www.') == 0) {
-		if (binarySearch(haystack, needle.substring(4)) != -1) return '1';
-	}
-	for (var i in haystack) {
-		if (haystack[i].indexOf("*") == -1 && haystack[i].indexOf("?") == -1) continue;
-		if (new RegExp('^(?:www\\.|^)(?:'+haystack[i].replace(/\./g, '\\.').replace(/^\[/, '\\[').replace(/\]$/, '\\]').replace(/\?/g, '.').replace(/\*/g, '[^.]+')+')').test(needle)) return '1';
-	}
-	return false;
+async function settings() {
+  await initialize();
+  return DPSettings.validate(
+    (await extension.storage.local.get("settings")).settings,
+  );
 }
-function binarySearch(list, item) {
-    var min = 0;
-    var max = list.length - 1;
-    var guess;
-	var bitwise = (max <= 2147483647) ? true : false;
-	if (bitwise) {
-		while (min <= max) {
-			guess = (min + max) >> 1;
-			if (list[guess] === item) { return guess; }
-			else {
-				if (list[guess] < item) { min = guess + 1; }
-				else { max = guess - 1; }
-			}
-		}
-	} else {
-		while (min <= max) {
-			guess = Math.floor((min + max) / 2);
-			if (list[guess] === item) { return guess; }
-			else {
-				if (list[guess] < item) { min = guess + 1; }
-				else { max = guess - 1; }
-			}
-		}
-	}
-    return -1;
+async function states() {
+  return (await extension.storage.session.get("tabs")).tabs || {};
 }
-function extractDomainFromURL(url) {
-	if (!url) return "";
-	if (url.indexOf("://") != -1) url = url.substr(url.indexOf("://") + 3);
-	if (url.indexOf("/") != -1) url = url.substr(0, url.indexOf("/"));
-	if (url.indexOf("@") != -1) url = url.substr(url.indexOf("@") + 1);
-	if (url.match(/^(?:\[[A-Fa-f0-9:.]+\])(:[0-9]+)?$/g)) {
-		if (url.indexOf("]:") != -1) return url.substr(0, url.indexOf("]:")+1);
-		return url;
-	}
-	if (url.indexOf(":") > 0) url = url.substr(0, url.indexOf(":"));
-	return url;
+async function setState(id, state) {
+  const tabs = await states();
+  if (state == null) delete tabs[id];
+  else tabs[id] = state;
+  await extension.storage.session.set({ tabs });
 }
-function domainHandler(domain,action) {
-	// Initialize local storage
-	if (typeof(localStorage['whiteList'])=='undefined') localStorage['whiteList'] = JSON.stringify([]);
-	if (typeof(localStorage['blackList'])=='undefined') localStorage['blackList'] = JSON.stringify([]);
-	var tempWhitelist = JSON.parse(localStorage['whiteList']);
-	var tempBlacklist = JSON.parse(localStorage['blackList']);
-	
-	// Remove domain from whitelist and blacklist
-	var pos = tempWhitelist.indexOf(domain);
-	if (pos>-1) tempWhitelist.splice(pos,1);
-	pos = tempBlacklist.indexOf(domain);
-	if (pos>-1) tempBlacklist.splice(pos,1);
-	
-	switch(action) {
-		case 0:	// Whitelist
-			tempWhitelist.push(domain);
-			break;
-		case 1:	// Blacklist
-			tempBlacklist.push(domain);
-			break;
-		case 2:	// Remove
-			break;
-	}
-	
-	localStorage['blackList'] = JSON.stringify(tempBlacklist);
-	localStorage['whiteList'] = JSON.stringify(tempWhitelist);
-	blackList = tempBlacklist.sort();
-	whiteList = tempWhitelist.sort();
-	return false;
+async function ensureTabState(tab) {
+  const config = await settings(),
+    tabs = await states(),
+    current = tabs[tab.id];
+  if (current && current.source !== "default") return;
+  let enabled = current?.enabled ?? config.newPages === "Cloak",
+    source = "default";
+  if (config.enableStickiness === "true" && tab.openerTabId) {
+    const opener = await extension.tabs.get(tab.openerTabId).catch(() => null);
+    if (
+      opener &&
+      DPSettings.enabled(config, opener.url, tabs[opener.id]?.enabled)
+    ) {
+      enabled = true;
+      source = "inherited";
+    }
+  }
+  if (!current || current.enabled !== enabled || current.source !== source)
+    await setState(tab.id, { enabled, source });
 }
-// ----- Options
-function optionExists(opt) {
-	return (typeof localStorage[opt] != "undefined");
+async function response(tab) {
+  const config = await settings(),
+    tabs = await states();
+  return {
+    type: "apply",
+    settings: config,
+    enabled: DPSettings.enabled(config, tab.url, tabs[tab.id]?.enabled),
+    paranoid:
+      config.global === "true"
+        ? Boolean(
+            (await extension.storage.session.get("globalParanoid"))
+              .globalParanoid,
+          )
+        : tabs[tab.id]?.paranoid || false,
+  };
 }
-function defaultOptionValue(opt, val) {
-	if (!optionExists(opt)) localStorage[opt] = val;
+async function updateTab(tab) {
+  if (!tab?.id) return;
+  const payload = await response(tab);
+  const icon = payload.settings.iconType;
+  try {
+    await extension.action.setIcon({
+      tabId: tab.id,
+      path:
+        "img/addressicon/" +
+        icon +
+        (payload.enabled ? "" : "-disabled") +
+        ".png",
+    });
+  } catch {
+    await extension.action
+      .setIcon({
+        tabId: tab.id,
+        path:
+          "img/addressicon/coffee" +
+          (payload.enabled ? "" : "-disabled") +
+          ".png",
+      })
+      .catch(() => {});
+  }
+  await extension.action
+    .setTitle({
+      tabId: tab.id,
+      title:
+        payload.settings.iconTitle +
+        (payload.enabled ? " — cloaked" : " — uncloaked"),
+    })
+    .catch(() => {});
+  // No receiver is normal on protected browser pages, closed tabs and before document_start.
+  await extension.tabs.sendMessage(tab.id, payload).catch(() => {});
 }
-function setDefaultOptions() {
-	defaultOptionValue("version", version);
-	defaultOptionValue("enable", "true");
-	defaultOptionValue("enableToggle", "true");
-	defaultOptionValue("hotkey", "CTRL F12");
-	defaultOptionValue("paranoidhotkey", "ALT P");
-	defaultOptionValue("global", "false");
-	defaultOptionValue("newPages", "Uncloak");
-	defaultOptionValue("sfwmode", "SFW");
-	defaultOptionValue("savedsfwmode", "");
-	defaultOptionValue("opacity1", "0.05");
-	defaultOptionValue("opacity2", "0.5");
-	defaultOptionValue("collapseimage", "false");
-	defaultOptionValue("showIcon", "true");
-	defaultOptionValue("iconType", "coffee");
-	defaultOptionValue("iconTitle", "Decreased Productivity");
-	defaultOptionValue("disableFavicons", "false");
-	defaultOptionValue("hidePageTitles", "false");
-	defaultOptionValue("pageTitleText", "Google Chrome");
-	defaultOptionValue("enableStickiness", "false");
-	defaultOptionValue("maxwidth", "0");
-	defaultOptionValue("maxheight", "0");
-	defaultOptionValue("showContext", "true");
-	defaultOptionValue("showUnderline", "true");
-	defaultOptionValue("removeBold", "false");
-	defaultOptionValue("showUpdateNotifications", "true");
-	defaultOptionValue("font", "Arial");
-	defaultOptionValue("customfont", "");
-	defaultOptionValue("fontsize", "12");
-	defaultOptionValue("s_bg", "FFFFFF");
-	defaultOptionValue("s_link", "000099");
-	defaultOptionValue("s_table", "cccccc");
-	defaultOptionValue("s_text", "000000");
-	defaultOptionValue("customcss", "");
-	// fix hotkey shortcut if in old format (if using + as separator instead of space)
-	if (localStorage["hotkey"].indexOf('+') != -1) {
-		localStorage["hotkey"] = localStorage["hotkey"].replace(/\+$/, "APLUSA").replace(/\+/g, " ").replace(/APLUSA/, "+");
-	}
-	// delete old option if exists
-	if (optionExists("globalEnable"))
-		delete localStorage["globalEnable"];
-	// delete old option if exists
-	if (optionExists("style"))
-		delete localStorage["style"];
-	// set SFW Level to SFW (for new change in v0.46.3)
-	if (localStorage["sfwmode"] == "true")
-		localStorage["sfwmode"] = "SFW";
-	if (!optionExists("blackList")) localStorage['blackList'] = JSON.stringify([]);
-	if (!optionExists("whiteList")) localStorage['whiteList'] = JSON.stringify([]);
+async function updateAll() {
+  await Promise.all((await extension.tabs.query({})).map(updateTab));
 }
-// Context Menu
-chrome.contextMenus.create({"title": chrome.i18n.getMessage("whitelistdomain"), "contexts": ['browser_action','page_action'], "onclick": function(info, tab){
-	if (tab.url.substring(0, 4) != 'http') return;
-	domainHandler(extractDomainFromURL(tab.url), 0);
-	if (localStorage["enable"] == "true") magician('false', tab.id);
-}});
-chrome.contextMenus.create({"title": chrome.i18n.getMessage("blacklistdomain"), "contexts": ['browser_action','page_action'], "onclick": function(info, tab){
-	if (tab.url.substring(0, 4) != 'http') return;
-	domainHandler(extractDomainFromURL(tab.url), 1);
-	if (localStorage["enable"] == "true") magician('true', tab.id);
-}});
-chrome.contextMenus.create({"title": chrome.i18n.getMessage("removelist"), "contexts": ['browser_action','page_action'], "onclick": function(info, tab){
-	if (tab.url.substring(0, 4) != 'http') return;
-	domainHandler(extractDomainFromURL(tab.url), 2);
-	if (localStorage["enable"] == "true")  {
-		var flag = 'false';
-		if (localStorage['newPages'] == 'Cloak' || localStorage['global'] == 'true') flag = 'true';
-		magician(flag, tab.id);
-	}
-}});
-
-// Called by clicking on the context menu item
-function newCloak(info, tab) {
-	// Enable cloaking (in case its been disabled) and open the link in a new tab
-	localStorage["enable"] = "true";
-	// If it's an image, load the "src" attribute
-	if (info.mediaType) chrome.tabs.create({'url': info.srcUrl}, function(tab){ cloakedTabs.push(tab.windowId+"|"+tab.id);recursiveCloak('true', localStorage["global"], tab.id); });
-	// Else, it's a normal link, so load the linkUrl.
-	else chrome.tabs.create({'url': info.linkUrl}, function(tab){ cloakedTabs.push(tab.windowId+"|"+tab.id);recursiveCloak('true', localStorage["global"], tab.id); });
+async function menus() {
+  const config = await settings();
+  await extension.contextMenus.removeAll();
+  for (const [id, key] of [
+    ["whitelist", "whitelistdomain"],
+    ["blacklist", "blacklistdomain"],
+    ["remove", "removelist"],
+  ]) {
+    extension.contextMenus.create({
+      id,
+      title: extension.i18n.getMessage(key),
+      contexts: ["action"],
+      documentUrlPatterns: ["http://*/*", "https://*/*"],
+    });
+  }
+  if (config.showContext === "true")
+    extension.contextMenus.create({
+      id: "safe-open",
+      title: extension.i18n.getMessage("opensafely"),
+      contexts: ["link", "image"],
+      targetUrlPatterns: ["http://*/*", "https://*/*"],
+    });
+  extension.contextMenus.create({
+    id: "options",
+    title: extension.i18n.getMessage("dpoptions"),
+    contexts: ["action"],
+  });
 }
-// Add context menu item that shows only if you right-click on links/images.
-function dpContext() {
-	if (localStorage["showContext"] == 'true' && !contextLoaded) {
-		chrome.contextMenus.create({"title": chrome.i18n.getMessage("opensafely"), "contexts": ['link', 'image'], "onclick": function(info, tab){newCloak(info, tab);}});
-		contextLoaded = true;
-	}
+async function toggle(tab, paranoid = false) {
+  if (!tab || !DPSettings.supported(tab.url)) return;
+  const config = await settings(),
+    all = await states(),
+    old = all[tab.id] || {};
+  if (config.global === "true")
+    old.paranoid = Boolean(
+      (await extension.storage.session.get("globalParanoid")).globalParanoid,
+    );
+  if (paranoid || old.paranoid) {
+    const next = paranoid ? !old.paranoid : false;
+    if (config.global === "true") {
+      await extension.storage.session.set({ globalParanoid: next });
+    } else
+      await setState(tab.id, {
+        enabled: true,
+        paranoid: next,
+        source: "manual",
+      });
+    if (config.enable !== "true")
+      await extension.storage.local.set({
+        settings: { ...config, enable: "true" },
+      });
+    if (config.global === "true" || config.enable !== "true") await updateAll();
+    else await updateTab(tab);
+    return;
+  }
+  if (config.global === "true") {
+    await extension.storage.local.set({
+      settings: {
+        ...config,
+        enable: config.enable === "true" ? "false" : "true",
+      },
+    });
+    await updateAll();
+  } else {
+    const current = DPSettings.enabled(config, tab.url, old.enabled);
+    await setState(tab.id, { ...old, enabled: !current, source: "manual" });
+    if (config.enable !== "true")
+      await extension.storage.local.set({
+        settings: { ...config, enable: "true" },
+      });
+    if (config.enable !== "true") await updateAll();
+    else await updateTab(tab);
+  }
 }
-// ----- Main Functions
-function checkChrome(url) {
-	if (url.substring(0, 6) == 'chrome') return true;
-	return false;
+async function changeDomain(domain, action) {
+  const config = await settings(),
+    value = DPSettings.domain(domain);
+  config.whiteList = config.whiteList.filter((item) => item !== value);
+  config.blackList = config.blackList.filter((item) => item !== value);
+  if (action === "whitelist") config.whiteList.push(value);
+  if (action === "blacklist") config.blackList.push(value);
+  await extension.storage.local.set({
+    settings: DPSettings.validate(config, true),
+  });
+  await updateAll();
+  return config;
 }
-function hotkeyChange() {
-	chrome.windows.getAll({"populate":true}, function(windows) {
-		windows.map(function(window) {
-			window.tabs.map(function(tab) {
-				if (!checkChrome(tab.url)) chrome.tabs.executeScript(tab.id, {code: 'hotkeySet("'+localStorage["enableToggle"]+'","'+localStorage["hotkey"]+'","'+localStorage["paranoidhotkey"]+'");', allFrames: true});
-			});
-		});
-	});
+async function handle(request, sender) {
+  if (request.type === "get-settings") return { settings: await settings() };
+  if (request.type === "get-state" && sender.tab) {
+    // sender.tab.url is always the top-level URL, including cross-origin subframe requests.
+    await serialized(async () =>
+      ensureTabState(await extension.tabs.get(sender.tab.id)),
+    );
+    return response(await extension.tabs.get(sender.tab.id));
+  }
+  if (["toggle", "paranoid"].includes(request.type) && sender.tab)
+    return serialized(() => toggle(sender.tab, request.type === "paranoid"));
+  if (request.type === "sync-style" && sender.tab)
+    return serialized(async () => {
+      const tab = await extension.tabs.get(sender.tab.id),
+        payload = await response(tab);
+      const key =
+          tab.id +
+          ":" +
+          (sender.documentId || request.documentKey || sender.frameId),
+        saved = (await extension.storage.session.get("css")).css || {};
+      const target =
+        sender.documentId && !globalThis.browser
+          ? { tabId: tab.id, documentIds: [sender.documentId] }
+          : { tabId: tab.id, frameIds: [sender.frameId] };
+      if (saved[key])
+        await extension.scripting
+          .removeCSS({ target, css: saved[key], origin: "USER" })
+          .catch(() => {});
+      if (payload.enabled) {
+        saved[key] = DPStyle.css(payload.settings, payload.paranoid, true);
+        await extension.scripting
+          .insertCSS({ target, css: saved[key], origin: "USER" })
+          .catch(() => {});
+      } else delete saved[key];
+      await extension.storage.session.set({ css: saved });
+      return {};
+    });
+  const trusted =
+    sender.id === extension.runtime.id &&
+    sender.url?.split(/[?#]/)[0] === extension.runtime.getURL("options.html");
+  if (!trusted)
+    throw new Error("This operation requires the extension options page.");
+  if (request.type === "save-settings")
+    return serialized(async () => {
+      const next = DPSettings.validate(
+        { ...(await settings()), ...request.patch },
+        true,
+      );
+      await extension.storage.local.set({ settings: next });
+      await menus();
+      await updateAll();
+      return { settings: next };
+    });
+  if (request.type === "domain")
+    return serialized(async () => ({
+      settings: await changeDomain(request.domain, request.action),
+    }));
+  throw new Error("Unknown request");
 }
-function optionsSaveTrigger(prevglob, newglob) {
-	var enable = localStorage["enable"];
-	var global = newglob;
-	if (prevglob == 'true' && newglob == 'false') {
-		global = 'true';
-		enable = 'false';
-	}
-	if (global == 'false') {
-		for (var i=cloakedTabs.length-1; i>=0; --i) {
-			magician(enable, parseInt(cloakedTabs[i].split("|")[1]));
-		}
-		if (enable == 'false') cloakedTabs = [];
-	} else recursiveCloak(enable, global);
+async function safeOpen(info, tab) {
+  const url = info.linkUrl || info.srcUrl;
+  if (!DPSettings.supported(url)) return;
+  const config = await settings();
+  if (config.enable !== "true")
+    await extension.storage.local.set({
+      settings: { ...config, enable: "true" },
+    });
+  // Create about:blank first so state is persisted before the target can execute content scripts.
+  const created = await extension.tabs.create({
+    url: "about:blank",
+    openerTabId: tab.id,
+  });
+  await setState(created.id, { enabled: true, source: "safe-open" });
+  await extension.tabs.update(created.id, { url });
+  return created;
 }
-function recursiveCloak(enable, global, tabId) {
-	if (global == 'true') {
-		chrome.windows.getAll({"populate":true}, function(windows) {
-			windows.map(function(window) {
-				window.tabs.map(function(tab) {
-					if (!checkChrome(tab.url)) {
-						var enabletemp = enable;
-						var dpdomaincheck = domainCheck(extractDomainFromURL(tab.url));
-						// Ensure whitelisted or blacklisted tabs stay as they are
-						if (enabletemp == 'true' && dpdomaincheck == '0') enabletemp = 'false';
-						else if (enabletemp == 'false' && dpdomaincheck == '1') enabletemp = 'true';
-						magician(enabletemp, tab.id);
-						var dpTabId = tab.windowId+"|"+tab.id;
-						var dpcloakindex = cloakedTabs.indexOf(dpTabId);
-						var dpuncloakindex = uncloakedTabs.indexOf(dpTabId);
-						if (enabletemp == 'false') {
-							if (dpuncloakindex == -1) uncloakedTabs.push(dpTabId);
-							if (dpcloakindex != -1) cloakedTabs.splice(dpcloakindex, 1);
-						} else {
-							if (dpcloakindex == -1) cloakedTabs.push(dpTabId);
-							if (dpuncloakindex != -1) uncloakedTabs.splice(dpuncloakindex, 1);
-						}
-					}
-				});
-			});
-		});
-	} else {
-		if (tabId) magician(enable, tabId);
-	}
-}
-function magician(enable, tabId) {
-	if (enable == 'true') {
-		if (localStorage["disableFavicons"] == 'true' && localStorage["hidePageTitles"] == 'true')
-			chrome.tabs.executeScript(tabId, {code: 'init();faviconblank();replaceTitle("'+localStorage["pageTitleText"]+'");titleBind("'+localStorage["pageTitleText"]+'");', allFrames: true});
-		else if (localStorage["disableFavicons"] == 'true' && localStorage["hidePageTitles"] != 'true')
-			chrome.tabs.executeScript(tabId, {code: 'init();faviconblank();titleRestore();', allFrames: true});
-		else if (localStorage["disableFavicons"] != 'true' && localStorage["hidePageTitles"] == 'true')
-			chrome.tabs.executeScript(tabId, {code: 'init();faviconrestore();replaceTitle("'+localStorage["pageTitleText"]+'");titleBind("'+localStorage["pageTitleText"]+'");', allFrames: true});
-		else if (localStorage["disableFavicons"] != 'true' && localStorage["hidePageTitles"] != 'true')
-			chrome.tabs.executeScript(tabId, {code: 'init();faviconrestore();titleRestore();', allFrames: true});
-	} else chrome.tabs.executeScript(tabId, {code: "removeCss();", allFrames: true});
-	if (localStorage["showIcon"] == 'true') {
-		if (enable == 'true') chrome.pageAction.setIcon({path: "img/addressicon/"+dpicon+".png", tabId: tabId});
-		else chrome.pageAction.setIcon({path: "img/addressicon/"+dpicon+"-disabled.png", tabId: tabId});
-		chrome.pageAction.setTitle({title: dptitle, tabId: tabId});
-		chrome.pageAction.show(tabId);
-	} else chrome.pageAction.hide(tabId);
-}
-function dpHandle(tab) {
-	if (checkChrome(tab.url)) return;
-	if (localStorage["global"] == "true" && domainCheck(extractDomainFromURL(tab.url)) != 1) {
-		if (localStorage["enable"] == "true") {
-			recursiveCloak('false', 'true');
-			localStorage["enable"] = "false";
-		} else {
-			recursiveCloak('true', 'true');
-			localStorage["enable"] = "true";
-		}
-	} else {
-		var dpTabId = tab.windowId+"|"+tab.id;
-		var dpcloakindex = cloakedTabs.indexOf(dpTabId);
-		var dpuncloakindex = uncloakedTabs.indexOf(dpTabId);
-		localStorage["enable"] = "true";
-		if (dpcloakindex != -1) {
-			magician('false', tab.id);
-			if (dpuncloakindex == -1) uncloakedTabs.push(dpTabId);
-			cloakedTabs.splice(dpcloakindex, 1);
-		} else {
-			magician('true', tab.id);
-			cloakedTabs.push(dpTabId);
-			if (dpuncloakindex != -1) uncloakedTabs.splice(dpuncloakindex, 1);
-		}
-	}
-}
-function setDPIcon() {
-	dpicon = localStorage["iconType"];
-	dptitle = localStorage["iconTitle"];
-	chrome.windows.getAll({"populate":true}, function(windows) {
-		windows.map(function(window) {
-			window.tabs.map(function(tab) {
-				if (cloakedTabs.indexOf(tab.windowId+"|"+tab.id) != -1) chrome.pageAction.setIcon({path: "img/addressicon/"+dpicon+".png", tabId: tab.id});
-				else chrome.pageAction.setIcon({path: "img/addressicon/"+dpicon+"-disabled.png", tabId: tab.id});
-				chrome.pageAction.setTitle({title: dptitle, tabId: tab.id});
-				if (localStorage["showIcon"] == 'true') chrome.pageAction.show(tab.id);
-				else chrome.pageAction.hide(tab.id);
-			});
-		});
-	});
-}
-function initLists() {
-	blackList = JSON.parse(localStorage['blackList']).sort();
-	whiteList = JSON.parse(localStorage['whiteList']).sort();	
-}
-// ----- Request library to support content script communication
-chrome.tabs.onUpdated.addListener(function(tabid, changeinfo, tab) {
-	if (changeinfo.status == "loading") {
-		var dpTabId = tab.windowId+"|"+tabid;
-		var dpcloakindex = cloakedTabs.indexOf(dpTabId);
-		var enable = enabled(tab, dpcloakindex);
-		if (localStorage["showIcon"] == "true") {
-			if (enable == "true") chrome.pageAction.setIcon({path: "img/addressicon/"+dpicon+".png", tabId: tabid});
-			else chrome.pageAction.setIcon({path: "img/addressicon/"+dpicon+"-disabled.png", tabId: tabid});
-			chrome.pageAction.setTitle({title: dptitle, tabId: tabid});
-			chrome.pageAction.show(tabid);
-		} else chrome.pageAction.hide(tabid);
-		if (checkChrome(tab.url)) return;
-		var dpuncloakindex = uncloakedTabs.indexOf(dpTabId);
-		if (enable == "true") {
-			magician('true', tabid);
-			if (localStorage["global"] == "false" && localStorage["enable"] == "false") localStorage["enable"] = "true";
-			if (dpcloakindex == -1) cloakedTabs.push(dpTabId);
-			if (dpuncloakindex != -1) uncloakedTabs.splice(dpuncloakindex, 1);
-		} else {
-			if (localStorage["enableStickiness"] == "true") {
-				if (tab.openerTabId) {
-					if (cloakedTabs.indexOf(tab.windowId+"|"+tab.openerTabId) != -1 && dpuncloakindex == -1) {
-						if (domainCheck(extractDomainFromURL(tab.url)) != '0') {
-							magician('true', tabid);
-							cloakedTabs.push(dpTabId);
-							return;
-						}
-					}
-					if (dpuncloakindex == -1) uncloakedTabs.push(dpTabId);
-					if (dpcloakindex != -1) cloakedTabs.splice(dpcloakindex, 1);
-				} else {
-					chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-						if (tabs[0].windowId == tab.windowId && cloakedTabs.indexOf(tabs[0].windowId+"|"+tabs[0].id) != -1 && dpuncloakindex == -1) {
-							if (domainCheck(extractDomainFromURL(tab.url)) != '0') {
-								magician('true', tabid);
-								cloakedTabs.push(dpTabId);
-								return;
-							}
-						}
-						if (dpuncloakindex == -1) uncloakedTabs.push(dpTabId);
-						if (dpcloakindex != -1) cloakedTabs.splice(dpcloakindex, 1);
-					});
-				}
-			}
-		}
-	}
-});	
-chrome.tabs.onRemoved.addListener(function(tabid, windowInfo) {
-	var dpTabId = windowInfo.windowId+"|"+tabid;
-	var dpcloakindex = cloakedTabs.indexOf(dpTabId);
-	var dpuncloakindex = uncloakedTabs.indexOf(dpTabId);
-	if (dpcloakindex != -1) cloakedTabs.splice(dpcloakindex, 1);
-	if (dpuncloakindex != -1) uncloakedTabs.splice(dpuncloakindex, 1);
+extension.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.target === "migration") return false;
+  handle(request, sender).then(sendResponse, (error) =>
+    sendResponse({ error: error.message }),
+  );
+  return true;
 });
-var requestDispatchTable = {
-	"get-enabled": function(request, sender, sendResponse) {
-		var dpTabId = sender.tab.windowId+"|"+sender.tab.id;
-		var dpcloakindex = cloakedTabs.indexOf(dpTabId);
-		var enable = enabled(sender.tab, dpcloakindex);
-		if (enable == 'true' && dpcloakindex == -1) cloakedTabs.push(dpTabId);
-		sendResponse({enable: enable, background: localStorage["s_bg"], favicon: localStorage["disableFavicons"], hidePageTitles: localStorage["hidePageTitles"], pageTitleText: localStorage["pageTitleText"], enableToggle: localStorage["enableToggle"], hotkey: localStorage["hotkey"], paranoidhotkey: localStorage["paranoidhotkey"]});
-	},
-	"toggle": function(request, sender, sendResponse) {
-		if (localStorage["savedsfwmode"] != "") {
-			localStorage["sfwmode"] = localStorage["savedsfwmode"];
-			localStorage["savedsfwmode"] = "";
-			if (localStorage["global"] == "true") recursiveCloak('true', 'true');
-			else {
-				magician('true', sender.tab.id);
-				var dpTabId = sender.tab.windowId+"|"+sender.tab.id;
-				var dpuncloakindex = uncloakedTabs.indexOf(dpTabId);
-				if (dpuncloakindex != -1) uncloakedTabs.splice(dpuncloakindex, 1);
-				if (cloakedTabs.indexOf(dpTabId) == -1) cloakedTabs.push(dpTabId);
-			}
-			localStorage["enable"] = "true";
-		} else {
-			dpHandle(sender.tab);
-		}
-	},
-	"toggleparanoid": function(request, sender, sendResponse) {
-		if (localStorage["savedsfwmode"] == "") {
-			localStorage["savedsfwmode"] = localStorage["sfwmode"];
-			localStorage["sfwmode"] = "Paranoid";
-			if (localStorage["global"] == "true") recursiveCloak('true', 'true');
-			else {
-				magician('true', sender.tab.id);
-				var dpTabId = sender.tab.windowId+"|"+sender.tab.id;
-				var dpuncloakindex = uncloakedTabs.indexOf(dpTabId);
-				if (dpuncloakindex != -1) uncloakedTabs.splice(dpuncloakindex, 1);
-				if (cloakedTabs.indexOf(dpTabId) == -1) cloakedTabs.push(dpTabId);
-			}
-			localStorage["enable"] = "true";
-		} else {
-			localStorage["sfwmode"] = localStorage["savedsfwmode"];
-			localStorage["savedsfwmode"] = "";
-			dpHandle(sender.tab);
-		}
-	},
-	"get-settings": function(request, sender, sendResponse) {
-		var enable, fontface;
-		if (localStorage["font"] == '-Custom-') {
-			if (localStorage["customfont"]) fontface = localStorage["customfont"];
-			else fontface = 'Arial';
-		} else fontface = localStorage["font"];
-		if (localStorage["global"] == "false") enable = 'true';
-		else enable = enabled(sender.tab);
-		sendResponse({enable: enable, sfwmode: localStorage["sfwmode"], font: fontface, fontsize: localStorage["fontsize"], underline: localStorage["showUnderline"], background: localStorage["s_bg"], text: localStorage["s_text"], table: localStorage["s_table"], link: localStorage["s_link"], bold: localStorage["removeBold"], opacity1: localStorage["opacity1"], opacity2: localStorage["opacity2"], collapseimage: localStorage["collapseimage"], maxheight: localStorage["maxheight"], maxwidth: localStorage["maxwidth"], customcss: localStorage["customcss"]});
-	}
-}
-chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
-	if (request.reqtype in requestDispatchTable) requestDispatchTable[request.reqtype](request, sender, sendResponse);
-	else sendResponse({});
+extension.action.onClicked.addListener((tab) => {
+  serialized(() => toggle(tab));
 });
-// ----- If page action icon is clicked, either enable or disable the cloak
-chrome.pageAction.onClicked.addListener(function(tab) {
-	dpHandle(tab);
+extension.contextMenus.onClicked.addListener((info, tab) => {
+  serialized(async () => {
+    if (info.menuItemId === "options")
+      return extension.runtime.openOptionsPage();
+    if (info.menuItemId === "safe-open") {
+      return safeOpen(info, tab);
+    }
+    if (DPSettings.supported(tab?.url))
+      await changeDomain(DPSettings.hostname(tab.url), info.menuItemId);
+  });
 });
-// Execute
-setDefaultOptions();
-// save blacklist and whitelist in global variable for faster lookups
-initLists();
-setDPIcon();
-dpContext();
-if ((!optionExists("version") || localStorage["version"] != version) && localStorage["showUpdateNotifications"] == 'true') {
-	//chrome.tabs.create({ url: chrome.extension.getURL('updated.html'), selected: false }); - minor update so don't show update page
-	localStorage["version"] = version;
-}
-chrome.runtime.onUpdateAvailable.addListener(function (details) {
-	// an update is available, but wait until user restarts their browser as to not disrupt their current session and cloaked tabs.
+extension.tabs.onCreated.addListener((tab) => {
+  serialized(async () => {
+    await ensureTabState(await extension.tabs.get(tab.id));
+    await updateTab(tab);
+  });
+});
+extension.tabs.onUpdated.addListener((id, change, tab) => {
+  if (change.status || change.url)
+    serialized(async () => {
+      await ensureTabState(tab);
+      await updateTab(tab);
+    });
+});
+extension.tabs.onRemoved.addListener((id) => {
+  serialized(async () => {
+    await setState(id, null);
+    const stored = (await extension.storage.session.get("css")).css || {};
+    for (const key of Object.keys(stored))
+      if (key.startsWith(id + ":")) delete stored[key];
+    await extension.storage.session.set({ css: stored });
+  });
+});
+extension.runtime.onStartup.addListener(() => {
+  serialized(async () => {
+    await extension.storage.session.clear();
+    await menus();
+    await updateAll();
+  });
+});
+extension.runtime.onInstalled.addListener((details) => {
+  serialized(async () => {
+    await initialize();
+    await menus();
+    // Reach pages already open at installation/update. The content script has a duplicate guard.
+    const tabs = await extension.tabs.query({});
+    await Promise.all(
+      tabs
+        .filter((tab) => DPSettings.supported(tab.url))
+        .map((tab) =>
+          extension.scripting
+            .executeScript({
+              target: { tabId: tab.id, allFrames: true },
+              files: ["js/settings.js", "js/style.js", "js/dp.js"],
+            })
+            .catch(() => {}),
+        ),
+    );
+    await updateAll();
+    if (
+      details.reason === "update" &&
+      (await settings()).showUpdateNotifications === "true"
+    )
+      await extension.tabs.create({
+        url: extension.runtime.getURL("updated.html"),
+        active: false,
+      });
+  });
 });

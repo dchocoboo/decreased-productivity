@@ -1,615 +1,237 @@
-// (c) Andrew
-// Icon by dunedhel: http://dunedhel.deviantart.com/
-// Supporting functions by AdThwart - T. Joseph
-var version = (function () {
-	var xhr = new XMLHttpRequest();
-	xhr.open('GET', chrome.extension.getURL('manifest.json'), false);
-	xhr.send(null);
-	return JSON.parse(xhr.responseText).version;
-}());
-var bkg = chrome.extension.getBackgroundPage();
-var error = false;
-var oldglobalstate = false;
-var settingnames = [];
-document.addEventListener('DOMContentLoaded', function () {
-	$("#tabs").tabs();
-	$("#o1").slider({min: 0, max: 1, step: 0.05, slide: function(event, ui) { $("#opacity1").val(ui.value); opacitytest(); }, stop: function(event, ui) { 
-		if (ui.value == 0) $("#collapseimageblock").show();
-		else $("#collapseimageblock").hide();
-		saveOptions();
-	}});
-	$("#o2").slider({min: 0, max: 1, step: 0.05, slide: function(event, ui) { $("#opacity2").val(ui.value); opacitytest(); }, stop: function(event, ui) { saveOptions(); }});
-	loadOptions();
-	colorPickLoad("s_bg");
-	colorPickLoad("s_text");
-	colorPickLoad("s_link");
-	colorPickLoad("s_table");
-	$(".i18_save, .i18_savecolours").click(saveOptions);
-	$(".i18_revertcolours").click(revertColours);
-	$(".i18_addwhitelist").click(function() { addList(0); });
-	$(".i18_addblacklist").click(function() { addList(1); });
-	$(".i18_dpoptions").click(function() { location.href='options.html'; });
-	$(".i18_clear").click(function() {
-		if ($(this).parent().find('strong').hasClass('i18_whitelist')) {
-			listclear(0);
-		} else {
-			listclear(1);
-		}
-	});
-	$("#enable, #enableToggle, #enableStickiness, #disableFavicons, #hidePageTitles, #showUnderline, #collapseimage, #removeBold, #showContext, #showIcon, #showUpdateNotifications").click(saveOptions);
-	$("#iconTitle, #customcss").blur(saveOptions);
-	$("#s_bg, #s_text, #s_link, #s_table").keyup(updateDemo);
-	$("#global").click(function() {
-		saveOptions();
-	});
-	$("#opacity1").blur(function() {
-		intValidate(this, 0.05);
-		if (this.value == 0) $("#collapseimageblock").show();
-		else $("#collapseimageblock").hide();
-		opacitytest();
-	});
-	$("#opacity2").blur(function() {
-		intValidate(this, 0.5);
-		opacitytest();
-	});
-	$("#maxwidth, #maxheight").blur(function() {
-		intValidate(this);
-	});
-	$("#pageTitleText").blur(pageTitleValidation);
-	$("#font").change(function() {
-		//if ($(this).val() == '-Unchanged-') $("#fontsize").parent().parent().hide();
-		//else $("#fontsize").parent().parent().show();
-		updateDemo();
-	});
-	// Hotkey
-	var listener;
-	var listener2;
-	var keysettings = {
-		is_solitary    : true,
-		is_unordered    : true,
-		is_exclusive    : true,
-		prevent_repeat  : true, 
-		is_sequence  : false,
-		is_counting  : false
-	};
-	listener = new window.keypress.Listener($("#hotkey"), keysettings);
-	listener.register_many(combos);
-	listener2 = new window.keypress.Listener($("#paranoidhotkey"), keysettings);
-	listener2.register_many(combos);
-	$("#hotkeyrecord").click(function() {
-		$("#hotkeyrecord").val(chrome.i18n.getMessage("hotkey_set"));
-		$("#hotkey").removeAttr('disabled').select().focus();
-	});
-	$("#paranoidhotkeyrecord").click(function() {
-		$("#paranoidhotkeyrecord").val(chrome.i18n.getMessage("hotkey_set"));
-		$("#paranoidhotkey").removeAttr('disabled').select().focus();
-	});
-	//
-	$("#iconType").change(function() {
-		$("#sampleicon").attr('src', '../img/addressicon/'+$(this).val()+'.png');
-	});
-	$("#fontsize").change(fontsizeValidation);
-	$("#newPages, #sfwmode, #font, #iconType").change(saveOptions);
-	$("#s_preset").change(function() {
-		stylePreset($(this).val());
-	});
-	$("#settingsall").click(settingsall);
-	$("#importsettings").click(settingsImport);
-	$("#savetxt").click(downloadtxt);
-	$(".i18_close").click(closeOptions);
+"use strict";
+const extension = globalThis.browser || chrome;
+let current;
+let saving = Promise.resolve();
+const form = document.getElementById("settings-form");
+const message = document.getElementById("message");
+function notify(text, error = false) {
+  message.textContent = text;
+  message.classList.toggle("error", error);
+}
+async function request(payload) {
+  const result = await extension.runtime.sendMessage(payload);
+  if (result.error) throw new Error(result.error);
+  return result;
+}
+function enqueue(task) {
+  saving = saving.then(task).catch((error) => notify(error.message, true));
+  return saving;
+}
+function read() {
+  const patch = {};
+  for (const key of Object.keys(DPSettings.defaults)) {
+    const element = document.getElementById(key);
+    if (element && !key.endsWith("List"))
+      patch[key] =
+        element.type === "checkbox" ? String(element.checked) : element.value;
+  }
+  return patch;
+}
+function render(config, loadFields = true) {
+  current = config;
+  if (loadFields)
+    for (const [key, value] of Object.entries(config)) {
+      const element = document.getElementById(key);
+      if (element && !key.endsWith("List")) {
+        if (element.type === "checkbox") element.checked = value === "true";
+        else element.value = value;
+      }
+    }
+  for (const key of ["whiteList", "blackList"]) {
+    const list = document.getElementById(key);
+    list.replaceChildren();
+    if (!config[key].length) {
+      const empty = document.createElement("li");
+      empty.textContent = extension.i18n.getMessage("empty");
+      list.append(empty);
+    }
+    for (const domain of config[key]) {
+      const item = document.createElement("li"),
+        name = document.createElement("span"),
+        remove = document.createElement("button");
+      name.textContent = domain;
+      remove.textContent = "Remove";
+      remove.type = "button";
+      remove.setAttribute("aria-label", "Remove " + domain);
+      remove.addEventListener("click", () =>
+        enqueue(async () => {
+          render(
+            (await request({ type: "domain", domain, action: "remove" }))
+              .settings,
+            false,
+          );
+          notify("Domain removed.");
+        }),
+      );
+      item.append(name, remove);
+      list.append(item);
+    }
+  }
+  document.getElementById("settingsexport").value = JSON.stringify(
+    config,
+    null,
+    2,
+  );
+  preview();
+}
+function preview() {
+  const draft = DPSettings.validate({ ...current, ...read() }),
+    node = document.getElementById("preview");
+  node.style.backgroundColor = "#" + draft.s_bg;
+  node.style.color = "#" + draft.s_text;
+  node.style.borderColor = "#" + draft.s_table;
+  node.style.fontSize = draft.fontsize + "px";
+  node.style.fontFamily =
+    draft.font === "-Custom-"
+      ? draft.customfont
+      : draft.font === "-Unchanged-"
+        ? "system-ui"
+        : draft.font;
+  node.querySelector("a").style.color = "#" + draft.s_link;
+  node.querySelector("a").style.textDecoration =
+    draft.showUnderline === "true" ? "underline" : "none";
+  node.querySelector("h3").style.fontWeight =
+    draft.removeBold === "true" ? "normal" : "bold";
+  const image = node.querySelector("img");
+  image.style.opacity = draft.sfwmode === "NSFW" ? "1" : draft.opacity1;
+  image.style.visibility = draft.sfwmode === "Paranoid" ? "hidden" : "visible";
+  image.onmouseenter = () => {
+    image.style.opacity = draft.sfwmode === "NSFW" ? "1" : draft.opacity2;
+  };
+  image.onmouseleave = () => {
+    image.style.opacity = draft.sfwmode === "NSFW" ? "1" : draft.opacity1;
+  };
+}
+function save(patch) {
+  return enqueue(async () => {
+    if (!form.reportValidity()) return;
+    DPSettings.validate({ ...current, ...patch }, true);
+    render((await request({ type: "save-settings", patch })).settings, false);
+    notify(extension.i18n.getMessage("saved"));
+  });
+}
+form.addEventListener("submit", (event) => {
+  event.preventDefault();
+  save(read());
 });
-function keyhandle(keypressed) {
-	keypressed = keypressed.toUpperCase();
-	if ($("#hotkey").attr('disabled')) {
-		if (keypressed != $("#hotkey").val()) {
-			$("#paranoidhotkey").val(keypressed).attr('disabled', 'true');
-			$("#paranoidhotkeyrecord").val(chrome.i18n.getMessage("hotkey_record"));
-			saveOptions();
-		}
-	} else {
-		if (keypressed != $("#paranoidhotkey").val()) {
-			$("#hotkey").val(keypressed).attr('disabled', 'true');
-			$("#hotkeyrecord").val(chrome.i18n.getMessage("hotkey_record"));
-			saveOptions();
-		}
-	}
+form.addEventListener("change", (event) => {
+  const key = event.target.id;
+  if (Object.hasOwn(DPSettings.defaults, key))
+    save({
+      [key]:
+        event.target.type === "checkbox"
+          ? String(event.target.checked)
+          : event.target.value,
+    });
+});
+form.addEventListener("input", preview);
+for (const button of document.querySelectorAll("[data-domain]"))
+  button.addEventListener("click", () => {
+    const domain = document.getElementById("domain").value;
+    enqueue(async () => {
+      render(
+        (
+          await request({
+            type: "domain",
+            domain,
+            action: button.dataset.domain,
+          })
+        ).settings,
+        false,
+      );
+      document.getElementById("domain").value = "";
+      notify("Domain list saved.");
+    });
+  });
+for (const button of document.querySelectorAll("[data-clear]"))
+  button.addEventListener("click", () => {
+    if (confirm("Clear this domain list?"))
+      save({ [button.dataset.clear]: [] });
+  });
+for (const button of document.querySelectorAll("[data-record]"))
+  button.addEventListener("click", () => {
+    const input = document.getElementById(button.dataset.record);
+    input.focus();
+    notify("Press the shortcut to record. Escape cancels.");
+    function record(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (["Control", "Meta", "Alt", "Shift"].includes(event.key)) return;
+      input.removeEventListener("keydown", record);
+      if (event.key === "Escape") {
+        notify("Recording cancelled.");
+        return;
+      }
+      input.value = [
+        event.ctrlKey && "CTRL",
+        event.metaKey && "CMD",
+        event.altKey && "ALT",
+        event.shiftKey && "SHIFT",
+        event.key === " " ? "SPACE" : event.key.toUpperCase(),
+      ]
+        .filter(Boolean)
+        .join(" ");
+      save({ [input.id]: input.value });
+    }
+    input.addEventListener("keydown", record);
+  });
+document.getElementById("importsettings").addEventListener("click", () =>
+  enqueue(async () => {
+    const parsed = DPSettings.importSettings(
+      document.getElementById("settingsimport").value,
+      current,
+    );
+    render((await request({ type: "save-settings", patch: parsed })).settings);
+    document.getElementById("settingsimport").value = "";
+    notify(extension.i18n.getMessage("importsuccessoptions"));
+  }),
+);
+document.getElementById("savetxt").addEventListener("click", () => {
+  const url = URL.createObjectURL(
+    new Blob([JSON.stringify(current, null, 2)], { type: "application/json" }),
+  );
+  const link = document.createElement("a");
+  link.href = url;
+  link.download =
+    "dp-settings-" + new Date().toISOString().slice(0, 10) + ".json";
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+document
+  .getElementById("close")
+  .addEventListener("click", () => window.close());
+document.getElementById("preset").addEventListener("change", (event) => {
+  const presets = {
+    "white-blue": ["FFFFFF", "000000", "000099", "cccccc"],
+    "white-gray": ["FFFFFF", "AAAAAA", "AAAAAA", "AAAAAA"],
+    "white-green": ["FFFFFF", "000000", "008000", "cccccc"],
+    "gray-blue": ["EEEEEE", "000000", "000099", "cccccc"],
+    "red-blue": ["FFEEE3", "555555", "7F75AA", "cccccc"],
+    brown: ["2c2c2c", "e5e9a8", "5cb0cc", "7f7f7f"],
+    "black-blue": ["000000", "FFFFFF", "3366FF", "333333"],
+    "black-green": ["000000", "FFFFFF", "00FF00", "333333"],
+    "black-red": ["000000", "FFFFFF", "FF0000", "333333"],
+    "black-pink": ["000000", "FFFFFF", "FF1CAE", "333333"],
+  };
+  if (!presets[event.target.value]) return;
+  const patch = Object.fromEntries(
+    ["s_bg", "s_text", "s_link", "s_table"].map((key, index) => [
+      key,
+      presets[event.target.value][index],
+    ]),
+  );
+  for (const [key, value] of Object.entries(patch))
+    document.getElementById(key).value = value;
+  preview();
+  save(patch);
+});
+for (const element of document.querySelectorAll("[data-i18n]")) {
+  const text = extension.i18n.getMessage(element.dataset.i18n);
+  if (text) element.textContent = text;
 }
-function loadCheckbox(id) {
-	document.getElementById(id).checked = typeof localStorage[id] == "undefined" ? false : localStorage[id] == "true";
-}
-
-function loadElement(id) {
-	$("#"+id).val(localStorage[id]);
-}
-
-function saveCheckbox(id) {
-	localStorage[id] = document.getElementById(id).checked;
-}
-
-function saveElement(id) {
-	localStorage[id] = $("#"+id).val();
-}
-function closeOptions() {
-	window.open('', '_self', '');window.close();
-}
-function settingsall() {
-	selectAll('settingsexport');
-}
-function selectAll(id) {
-	$("#"+id).select();
-}
-function i18load() {
-	$("#title").html("Decreased Productivity v"+version);
-	$(".i18_default").html(chrome.i18n.getMessage("default"));
-	$(".i18_enable").html(chrome.i18n.getMessage("enable"));
-	$(".i18_enabled").html(chrome.i18n.getMessage("enabled"));
-	$(".i18_disabled").html(chrome.i18n.getMessage("disabled"));
-	$(".i18_globalmode").html(chrome.i18n.getMessage("globalmode"));
-	$(".i18_globalmode2").html(chrome.i18n.getMessage("globalmode2"));
-	$(".i18_globalmode3").html(chrome.i18n.getMessage("globalmode3"));
-	$(".i18_cloak").html(chrome.i18n.getMessage("cloak"));
-	$(".i18_uncloak").html(chrome.i18n.getMessage("uncloak"));
-	$(".i18_level").html(chrome.i18n.getMessage("level"));
-	$(".i18_paranoid").html(chrome.i18n.getMessage("paranoid"));
-	$(".i18_sfw0").html(chrome.i18n.getMessage("sfw0"));
-	$(".i18_sfw1").html(chrome.i18n.getMessage("sfw1"));
-	$(".i18_sfw2").html(chrome.i18n.getMessage("sfw2"));
-	$(".i18_nsfw").html(chrome.i18n.getMessage("nsfw"));
-	$(".i18_toggle").html(chrome.i18n.getMessage("toggle"));
-	$(".i18_toggle2").html(chrome.i18n.getMessage("toggle2"));
-	$(".i18_toggle_hotkey").html(chrome.i18n.getMessage("hotkey"));
-	$(".i18_toggle_paranoidhotkey").html(chrome.i18n.getMessage("paranoidhotkey"));
-	$(".i18_hotkey_record").val(chrome.i18n.getMessage("hotkey_record"));
-	$(".i18_opacity").html(chrome.i18n.getMessage("opacity"));
-	$(".i18_collapseimage").html(chrome.i18n.getMessage("collapseimage"));
-	$(".i18_opacity2").html(chrome.i18n.getMessage("opacity2"));
-	$(".i18_unhovered").html(chrome.i18n.getMessage("unhovered"));
-	$(".i18_hovered").html(chrome.i18n.getMessage("hovered"));
-	$(".i18_stickiness").html(chrome.i18n.getMessage("stickiness"));
-	$(".i18_stickiness2").html(chrome.i18n.getMessage("stickiness2"));
-	$(".i18_favicons").html(chrome.i18n.getMessage("favicons"));
-	$(".i18_hidetitles").html(chrome.i18n.getMessage("hidetitles"));
-	$(".i18_showimages").html(chrome.i18n.getMessage("showimages"));
-	$(".i18_showimages2").html(chrome.i18n.getMessage("showimages2"));
-	$(".i18_showunderline").html(chrome.i18n.getMessage("showunderline"));
-	$(".i18_removebold").html(chrome.i18n.getMessage("removebold"));
-	$(".i18_showcontext").html(chrome.i18n.getMessage("showcontext"));
-	$(".i18_showcontext2").html(chrome.i18n.getMessage("showcontext2"));
-	$(".i18_showicon").html(chrome.i18n.getMessage("showicon"));
-	$(".i18_showicon2").html(chrome.i18n.getMessage("showicon2"));
-	$(".i18_showicon_type").html(chrome.i18n.getMessage("showicon_type"));
-	$(".i18_showicon_type2").html(chrome.i18n.getMessage("showicon_type2"));
-	$(".i18_showicon_title").html(chrome.i18n.getMessage("showicon_title"));
-	$(".i18_showupdate").html(chrome.i18n.getMessage("showupdate"));
-	$(".i18_showupdate2").html(chrome.i18n.getMessage("showupdate2"));
-	$(".i18_font").html(chrome.i18n.getMessage("font"));
-	$(".i18_customfont").html(chrome.i18n.getMessage("customfont"));
-	$(".i18_fontsize").html(chrome.i18n.getMessage("fontsize"));
-	$(".i18_color").html(chrome.i18n.getMessage("color"));
-	$(".i18_colorpresets").html(chrome.i18n.getMessage("colorpresets"));
-	$(".i18_colorpresetselect").html('-- '+chrome.i18n.getMessage("colorpresetselect")+' --');
-	$(".i18_colorbackground").html(chrome.i18n.getMessage("colorbackground"));
-	$(".i18_colortext").html(chrome.i18n.getMessage("colortext"));
-	$(".i18_colorlink").html(chrome.i18n.getMessage("colorlink"));
-	$(".i18_colortable").html(chrome.i18n.getMessage("colortable"));
-	$(".i18_c1").html(chrome.i18n.getMessage("white")+' - '+chrome.i18n.getMessage("blue"));
-	$(".i18_c2").html(chrome.i18n.getMessage("white")+' - '+chrome.i18n.getMessage("gray"));
-	$(".i18_c3").html(chrome.i18n.getMessage("gray")+' - '+chrome.i18n.getMessage("blue"));
-	$(".i18_c4").html(chrome.i18n.getMessage("lightred")+' - '+chrome.i18n.getMessage("paleblue"));
-	$(".i18_c5").html(chrome.i18n.getMessage("darkbrown")+' - '+chrome.i18n.getMessage("offwhite"));
-	$(".i18_c6").html(chrome.i18n.getMessage("black")+' - '+chrome.i18n.getMessage("blue"));
-	$(".i18_c7").html(chrome.i18n.getMessage("black")+' - '+chrome.i18n.getMessage("green"));
-	$(".i18_c8").html(chrome.i18n.getMessage("black")+' - '+chrome.i18n.getMessage("red"));
-	$(".i18_c9").html(chrome.i18n.getMessage("black")+' - '+chrome.i18n.getMessage("pink"));
-	$(".i18_c10").html(chrome.i18n.getMessage("white")+' - '+chrome.i18n.getMessage("green"));
-	$(".i18_demo").html(chrome.i18n.getMessage("demo"));
-	$(".i18_test1").html(chrome.i18n.getMessage("test1"));
-	$(".i18_test2").html(chrome.i18n.getMessage("test2"));
-	$(".i18_savecolours").val(chrome.i18n.getMessage("savecolours"));
-	$(".i18_revertcolours").val(chrome.i18n.getMessage("revertcolours"));
-	$(".i18_domain").html(chrome.i18n.getMessage("domain"));
-	$(".i18_addwhitelist").val("+ "+chrome.i18n.getMessage("whitelist"));
-	$(".i18_addblacklist").val("+ "+chrome.i18n.getMessage("blacklist"));
-	$(".i18_whitelist").html(chrome.i18n.getMessage("whitelist"));
-	$(".i18_blacklist").html(chrome.i18n.getMessage("blacklist"));
-	$(".i18_clear").html(chrome.i18n.getMessage("clear"));
-	$(".i18_save").val(chrome.i18n.getMessage("save"));
-	$(".i18_close").val(chrome.i18n.getMessage("close"));
-	$(".i18_people").html(chrome.i18n.getMessage("people"));
-	$(".i18_translators").html(chrome.i18n.getMessage("translators"));
-	$(".i18_help").html(chrome.i18n.getMessage("help"));
-	$(".i18_support").html(chrome.i18n.getMessage("support"));
-	$("#customcssdesc").html(chrome.i18n.getMessage("customcss"));
-	$(".i18_supportimg").attr({alt: chrome.i18n.getMessage("support"), title:  chrome.i18n.getMessage("support")});
-}
-function loadOptions() {
-	document.title = chrome.i18n.getMessage("dpoptions");
-	i18load();
-	oldglobalstate = localStorage["global"];
-	loadCheckbox("enable");
-	loadCheckbox("global");
-	loadCheckbox("enableToggle");
-	loadElement("hotkey");
-	loadElement("paranoidhotkey");
-	if ($("#hotkey").val()) $("#hotkey").val($("#hotkey").val().toUpperCase());
-	if ($("#paranoidhotkey").val()) $("#paranoidhotkey").val($("#paranoidhotkey").val().toUpperCase());
-	loadElement("newPages");
-	loadElement("sfwmode");
-	loadElement("opacity1");
-	loadElement("opacity2");
-	loadCheckbox("collapseimage");
-	loadCheckbox("showIcon");
-	loadElement("iconType");
-	loadElement("iconTitle");
-	loadCheckbox("disableFavicons");
-	loadCheckbox("hidePageTitles");
-	loadElement("pageTitleText");
-	loadElement("maxwidth");
-	loadElement("maxheight");
-	loadCheckbox("enableStickiness");
-	loadCheckbox("showContext");
-	loadCheckbox("showUnderline");
-	loadCheckbox("removeBold");
-	loadCheckbox("showUpdateNotifications");
-	loadElement("font");
-	loadElement("customfont");
-	loadElement("fontsize");
-	loadElement("s_text");
-	loadElement("s_bg");
-	loadElement("s_table");
-	loadElement("s_link");
-	if ($('#global').is(':checked')) $("#newPagesRow").css('display', 'none');
-	if ($('#showIcon').is(':checked')) $(".discreeticonrow").show();
-	if ($('#enableToggle').is(':checked')) $("#hotkeyrow, #paranoidhotkeyrow").show();
-	$("#sampleicon").attr('src', '../img/addressicon/'+$('#iconType').val()+'.png');
-	if (!$('#hidePageTitles').is(':checked')) $("#pageTitle").css('display', 'none');
-	if ($('#opacity1').val() == 0) $("#collapseimageblock").css('display', 'block');
-	if ($('#sfwmode').val() == 'SFW' || $('#sfwmode').val() == 'SFW1' || $('#sfwmode').val() == 'SFW2') $("#opacityrow").show();
-	if ($('#font').val() == '-Custom-') {
-		if ($("#customfont").val()) $("#customfontrow").show();
-		else {
-			$('#font').val('Arial');
-			$("#customfontrow").hide();
-		}
-	}
-	loadElement("customcss");
-	listUpdate();
-	opacitytest();
-	updateDemo();
-}
-function isValidColor(hex) { 
-	var strPattern = /^[0-9a-f]{3,6}$/i; 
-	return strPattern.test(hex); 
-}
-
-function saveOptions() {
-	updateDemo();
-	if (!$('#enable').is(':checked') && !$('#global').is(':checked')) {
-		$('#enable').prop('checked', true);
-	}
-	if ($('#global').is(':checked')) $("#newPagesRow").css('display', 'none');
-	else $("#newPagesRow").css('display', 'block');
-	if ($('#enableToggle').is(':checked')) $("#hotkeyrow, #paranoidhotkeyrow").show();
-	else $("#hotkeyrow, #paranoidhotkeyrow").hide();
-	if ($('#hidePageTitles').is(':checked')) $("#pageTitle").css('display', 'block');
-	else $("#pageTitle").css('display', 'none');
-	if ($('#sfwmode').val() == 'SFW' || $('#sfwmode').val() == 'SFW1' || $('#sfwmode').val() == 'SFW2') $("#opacityrow").fadeIn("fast");
-	else $("#opacityrow").hide();
-	if ($('#font').val() == '-Custom-') $("#customfontrow").show();
-	else $("#customfontrow").hide();
-	if (!$("#hotkey").val()) $("#hotkey").val('CTRL F12');
-	if (!$("#paranoidhotkey").val()) $("#paranoidhotkey").val('ALT P');
-	saveCheckbox("enable");
-	saveCheckbox("global");
-	saveCheckbox("enableToggle");
-	saveElement("hotkey");
-	saveElement("paranoidhotkey");
-	saveElement("opacity1");
-	saveElement("opacity2");
-	saveCheckbox("collapseimage");
-	saveElement("newPages");
-	saveElement("sfwmode");
-	saveCheckbox("showIcon");
-	saveElement("iconType");
-	saveElement("iconTitle");
-	saveCheckbox("disableFavicons");
-	saveCheckbox("hidePageTitles");
-	saveElement("pageTitleText");
-	saveElement("maxwidth");
-	saveElement("maxheight");
-	saveCheckbox("enableStickiness");
-	saveCheckbox("showContext");
-	saveCheckbox("showUnderline");
-	saveCheckbox("removeBold");
-	saveCheckbox("showUpdateNotifications");
-	saveElement("font");
-	saveElement("customfont");
-	saveElement("fontsize");
-	if ($('#showIcon').is(':checked')) {
-		$(".discreeticonrow").show();
-		bkg.setDPIcon();
-	} else $(".discreeticonrow").hide();
-	if (isValidColor($('#s_text').val()) && isValidColor($('#s_bg').val()) && isValidColor($('#s_table').val()) && isValidColor($('#s_link').val())) {
-		saveElement("s_text");
-		saveElement("s_bg");
-		saveElement("s_table");
-		saveElement("s_link");
-	} else {
-		error = true;
-	}
-	$("#customcss").val($("#customcss").val().replace(/\s*<([^>]+)>\s*/ig, ""));
-	saveElement("customcss");
-	updateExport();
-	// Apply new settings
-	bkg.optionsSaveTrigger(oldglobalstate, localStorage["global"]);
-	bkg.hotkeyChange();
-	oldglobalstate = localStorage["global"];
-	// Remove any existing styling
-	if (!error) notification(chrome.i18n.getMessage("saved"));
-	else notification(chrome.i18n.getMessage("invalidcolour"));
-}
-
-function opacitytest() {
-	$("#o1").slider("option", "value", $("#opacity1").val());
-	$("#o2").slider("option", "value", $("#opacity2").val());
-	$(".sampleimage").css({"opacity": $("#opacity1").val()});
-	$(".sampleimage").hover(
-		function () {
-			$(this).css("opacity", $("#opacity2").val());
-		}, 
-		function () {
-			$(this).css("opacity", $("#opacity1").val());
-		}
-	);
-}	
-
-function intValidate(elm, val) {
-	if (!is_int(elm.value)) {
-		notification(chrome.i18n.getMessage("invalidnumber"));
-		elm.value = val;
-	}
-	else saveOptions();
-}
-
-function is_int(value){ 
-	if(value != '' && !isNaN(value)) return true;
-	else return false;
-}	
-
-function pageTitleValidation() {
-	if ($.trim($("#pageTitleText").val()) == '') $("#pageTitleText").val('Google Chrome');
-	else saveOptions();
-}
-
-function fontsizeValidation() {
-	if (!is_int($.trim($("#fontsize").val()))) $("#fontsize").val('12');
-	updateDemo();
-}
-
-function notification(msg) {
-	$('#message').html(msg).stop().fadeIn("slow").delay(2000).fadeOut("slow")
-}
-function truncText(str) {
-	if (str.length > 16) return str.substr(0, 16)+'...';
-	return str;
-}
-function updateDemo() {
-	if ($('#disableFavicons').is(':checked')) $("#demo_favicon").attr('style','visibility: hidden');
-	else $("#demo_favicon").removeAttr('style');
-	if ($('#hidePageTitles').is(':checked')) $("#demo_title").text(truncText($("#pageTitleText").val()));	
-	else $("#demo_title").text(chrome.i18n.getMessage("demo")+' Page');
-	$("#demo_content").css('backgroundColor', $("#s_bg").val());
-	$("#t_link").css('color', $("#s_link").val());
-	$("#test table").css('border', "1px solid #" + $("#s_table").val());
-	$("#t_table, #demo_content h1").css('color', $("#s_text").val());
-	if ($("#font").val() == '-Custom-' && $("#customfont").val()) {
-		$("#t_table, #demo_content h1").css({'font-family': $("#customfont").val(), 'font-size': $("#fontsize").val()});
-	} else if ($("#font").val() != '-Unchanged-' && $("#font").val() != '-Custom-') {
-		$("#t_table, #demo_content h1").css({'font-family': $("#font").val(), 'font-size': $("#fontsize").val()});
-	} else {	
-		$("#t_table, #demo_content h1").css({'font-family': 'Arial, sans-serif', 'font-size': '12px'});
-	}
-	if ($('#hidePageTitles').is(':checked')) $("#t_link").css('textDecoration', 'underline');
-	if ($('#removeBold').is(':checked')) $("#demo_content h1").css('font-weight', 'normal');
-	else  $("#demo_content h1").css('font-weight', 'bold');
-	if ($('#showUnderline').is(':checked')) $("#t_link").css('textDecoration', 'underline');
-	else $("#t_link").css('textDecoration', 'none');
-	if ($("#sfwmode").val() == 'Paranoid') $(".sampleimage").attr('style','visibility: hidden');
-	else if ($("#sfwmode").val() == 'NSFW') $(".sampleimage").attr('style','visibility: visible; opacity: 1 !important;').unbind();
-	else opacitytest();
-}
-
-function stylePreset(s) {
-	if (s) {
-		var bg='FFFFFF';
-		var text='000000';
-		var link='000099';
-		var table='cccccc';
-		// Specific style colours
-		switch (s)
-		{
-			case 'White - Gray':
-				text='AAAAAA';
-				link='AAAAAA';
-				table='AAAAAA';
-				break;
-			case 'White - Green':
-				link='008000';
-				break;
-			case 'Gray - Blue':
-				bg='EEEEEE';
-				break;
-			case 'Light Red - Pale Blue':
-				bg='FFEEE3';
-				text='555';
-				link='7F75AA';
-				break;
-			case 'Black - Blue':
-				bg='000000';
-				text='FFFFFF';
-				link='36F';
-				table='333333';
-				break;
-			case 'Dark Brown - Off-White':
-				bg='2c2c2c';
-				text='e5e9a8';
-				link='5cb0cc';
-				table='7f7f7f';
-				break;
-			case 'Black - Green':
-				bg='000000';
-				text='FFFFFF';
-				link='00FF00';
-				table='333333';
-				break;
-			case 'Black - Red':
-				bg='000000';
-				text='FFFFFF';
-				link='FF0000';
-				table='333333';
-				break;
-			case 'Black - Pink':
-				bg='000000';
-				text='FFFFFF';
-				link='FF1CAE';
-				table='333333';
-				break;
-		}
-		$('#s_bg').val(bg);
-		$('#s_text').val(text);
-		$('#s_link').val(link);
-		$('#s_table').val(table);
-		updateDemo();
-	}
-}
-
-// <!-- modified from KB SSL Enforcer: https://code.google.com/p/kbsslenforcer/
-function addList(type) {
-	var domain = $('#url').val();
-	domain = domain.toLowerCase();
-	
-	if (!domain.match(/^(?:[\-\w\*\?]+(\.[\-\w\*\?]+)*|((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[0-9]{1,2})\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[0-9]{1,2})|\[[A-Fa-f0-9:.]+\])?$/g)) {
-		$('#listMsg').html(chrome.i18n.getMessage("invaliddomain")).stop().fadeIn("slow").delay(2000).fadeOut("slow");
-	} else {
-		bkg.domainHandler(domain, type);
-		$('#url').val('');
-		$('#listMsg').html([chrome.i18n.getMessage("whitelisted"),chrome.i18n.getMessage("blacklisted")][type]+' '+domain+'.').stop().fadeIn("slow").delay(2000).fadeOut("slow");
-		listUpdate();
-		$('#url').focus();
-	}
-	return false;
-}
-function domainRemover(domain) {
-	bkg.domainHandler(domain,2);
-	listUpdate();
-	return false;
-}
-function listUpdate() {
-	var whiteList = JSON.parse(localStorage['whiteList']);
-	var blackList = JSON.parse(localStorage['blackList']);
-	
-	var whitelistCompiled = '';
-	if(whiteList.length==0) whitelistCompiled = '['+chrome.i18n.getMessage("empty")+']';
-	else {
-		whiteList.sort();
-		for(i in whiteList) whitelistCompiled += '<div class="listentry">'+whiteList[i]+' <a href="javascript:;" style="color:#f00;float:right;" rel="'+whiteList[i]+'" class="domainRemover">X</a></div>';
-	}
-	var blacklistCompiled = '';
-	if (blackList.length==0) blacklistCompiled = '['+chrome.i18n.getMessage("empty")+']';
-	else {
-		blackList.sort();
-		for(i in blackList) blacklistCompiled += '<div class="listentry">'+blackList[i]+' <a href="javascript:;" style="color:#f00;float:right;" rel="'+blackList[i]+'" class="domainRemover">X</a></div>';
-	}
-	$('#whitelist').html(whitelistCompiled);
-	$('#blacklist').html(blacklistCompiled);
-	$(".domainRemover").unbind('click');
-	$(".domainRemover").click(function() { domainRemover($(this).attr('rel'));});
-	bkg.initLists();
-	updateExport();
-}
-function listclear(type) {
-	if (confirm([chrome.i18n.getMessage("removefromwhitelist"),chrome.i18n.getMessage("removefromblacklist")][type]+'?')) {
-		localStorage[['whiteList','blackList'][type]] = JSON.stringify([]);
-		listUpdate();
-	}
-	return false;
-}
-// from KB SSL Enforcer: https://code.google.com/p/kbsslenforcer/ -->
-
-function revertColours(s) {
-	$('#s_bg').val(localStorage['s_bg']);
-	$('#s_text').val(localStorage['s_text']);
-	$('#s_link').val(localStorage['s_link']);
-	$('#s_table').val(localStorage['s_table']);
-	updateDemo();
-}
-
-function colorPickLoad(id) {
-	$('#'+id).ColorPicker({
-		onBeforeShow: function () {
-			$(this).ColorPickerSetColor(this.value);
-		},
-		onChange: function (hsb, hex, rgb) {
-			$('#'+id).val(hex);
-			updateDemo();
-		}
-	});
-}
-
-function downloadtxt() {
-	var textToWrite = $("#settingsexport").val();
-	var textFileAsBlob = new Blob([textToWrite], {type:'text/plain'});
-	var fileNameToSaveAs = "dp-settings-"+new Date().toJSON()+".txt";
-	var downloadLink = document.createElement("a");
-	downloadLink.download = fileNameToSaveAs;
-	downloadLink.innerHTML = "Download File";
-	downloadLink.href = window.webkitURL.createObjectURL(textFileAsBlob);
-	downloadLink.click();
-	downloadLink.remove();
-}
-function updateExport() {
-	$("#settingsexport").val("");
-	settingnames = [];
-	for (var i in localStorage) {
-		if (localStorage.hasOwnProperty(i)) {
-			if (i != "version") {
-				settingnames.push(i);
-				$("#settingsexport").val($("#settingsexport").val()+i+"|"+localStorage[i].replace(/(?:\r\n|\r|\n)/g, ' ')+"\n");
-			}
-		}
-	}
-	$("#settingsexport").val($("#settingsexport").val().slice(0,-1));
-}
-function settingsImport() {
-	var error = "";
-	var settings = $("#settingsimport").val().split("\n");
-	if ($.trim($("#settingsimport").val()) == "") {
-		notification(chrome.i18n.getMessage("pastesettings"));
-		return false;
-	}
-	if (settings.length > 0) {
-		$.each(settings, function(i, v) {
-			if ($.trim(v) != "") {
-				var settingentry = $.trim(v).split("|");
-				if (settingnames.indexOf($.trim(settingentry[0])) != -1) {
-					if ($.trim(settingentry[0]) == 'whiteList' || $.trim(settingentry[0]) == 'blackList') {
-						var listarray = $.trim(settingentry[1]).replace(/(\[|\]|")/g,"").split(",");
-						if ($.trim(settingentry[0]) == 'whiteList' && listarray.toString() != '') localStorage['whiteList'] = JSON.stringify(listarray);
-						else if ($.trim(settingentry[0]) == 'blackList' && listarray.toString() != '') localStorage['blackList'] = JSON.stringify(listarray);
-					} else 
-						localStorage[$.trim(settingentry[0])] = $.trim(settingentry[1]);
-				} else {
-					error += $.trim(settingentry[0])+", ";
-				}
-			}
-		});
-	}
-	loadOptions();
-	listUpdate();
-	if (!error) {
-		notification(chrome.i18n.getMessage("importsuccessoptions"));
-		$("#settingsimport").val("");
-	} else {
-		notification(chrome.i18n.getMessage("importsuccesscond")+error.slice(0, -2));
-	}
-}
+request({ type: "get-settings" })
+  .then((result) => {
+    render(result.settings);
+    notify("Settings loaded. Changes save automatically.");
+  })
+  .catch((error) => notify(error.message, true));

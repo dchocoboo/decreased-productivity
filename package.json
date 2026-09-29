@@ -1,0 +1,19 @@
+{
+  "name": "decreased-productivity",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Discreet page styling for modern WebExtension browsers",
+  "scripts": {
+    "test": "node --test tests/*.test.cjs",
+    "test:browser": "node tests/browser.cjs",
+    "build": "node scripts/build.cjs",
+    "lint:firefox": "web-ext lint --source-dir dist/firefox --warnings-as-errors",
+    "test:firefox": "node tests/firefox.cjs",
+    "format:check": "prettier --check manifest.json options.html css/options.css js/*.js migration.html updated.html scripts/*.cjs tests/*.cjs package.json"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0",
+    "prettier": "3.9.9",
+    "web-ext": "10.7.0"
+  }
+}

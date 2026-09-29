@@ -1,263 +1,492 @@
-<html>
-<head>
-<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-<title>DP Options</title>
-<link rel="stylesheet" href="css/options.css" type="text/css" />
-<link rel="stylesheet" href="css/colorpicker.css" type="text/css" />
-<link rel="stylesheet" href="css/jquery-ui.min.css"> 
-<link rel="stylesheet" href="css/jquery-ui.theme.min.css"> 
-<script type="text/javascript" src="js/jquery.js"></script>
-<script type="text/javascript" src="js/jquery-ui.min.js"></script> 
-<script type="text/javascript" src="js/colorpicker.js"></script>
-<script type="text/javascript" src="js/keys.min.js"></script> 
-<script type="text/javascript" src="js/keypress-2.1.4.min.js"></script>
-</head>
-<body>
-	<span id="title">Decreased Productivity</span> by Andrew Y.<br /><br />
-	<div id="message"></div>
-	<div id="main">
-		<div class="right"><input type="button" class="i18_save" value="Save" /> <input type="button" class="i18_close" value="Close" /><br /><br /></div> 
-		<div id="tabs" class="clear">
-			<ul>
-				<li><a href="#general">General</a></li>
-				<li><a href="#cloak">Cloak</a></li>
-				<li><a href="#lists">Lists</a></li>
-				<li><a href="#advanced">Custom CSS</a></li>
-				<li><a href="#importexport">Import/Export Settings</a></li>
-			</ul>
-			<div id="general">
-				<table cellspacing="5" cellpadding="0" border="0">
-				<tr>
-				<td>
-					<table border="0" cellspacing="0" cellpadding="0">
-						<tr class="first"><td><label for="enable" class="i18_enable">Enable</label></td><td><input type="checkbox" id="enable" /> <i>(<span class="i18_default">Default</span>: <span class="i18_enabled">enabled</span>)</i></td></tr>
-						<tr><td><label for="global" class="i18_globalmode">Global Mode</label></td><td><input type="checkbox" id="global" title="Note: if you modify this setting, you must refresh all open tabs again. Any changes in the below options will not take effect until you do so." /> <i>(<span class="i18_default">Default</span>: <span class="i18_disabled">disabled</span>; <span class="i18_globalmode2">tab-specific if unticked</span>)</i><div id="newPagesRow"><select id="newPages">
-							<option value="Cloak" class="i18_cloak">Cloak</option>
-							<option value="Uncloak" class="i18_uncloak">Uncloak</option>
-						</select> <span class="i18_globalmode3">new tabs by default</span> <i>(<span class="i18_default">Default</span>: <span class="i18_uncloak"></span>)</i></div></td></tr>
-						<tr><td><label for="enableToggle" class="i18_toggle">Enable Key Toggling</label></td><td><input type="checkbox" id="enableToggle" /> <i>(<span class="i18_default">Default</span>: <span class="i18_enabled">enabled</span>; <span class="i18_toggle2">press the set hotkey to toggle</span>)</i></td></tr>
-						<tr class="hide" id="hotkeyrow"><td><label for="hotkey" class="i18_toggle_hotkey">Hotkey Combination</label></td><td><input type="text" id="hotkey" disabled /> <input id="hotkeyrecord" type="button" value="Record" class="i18_hotkey_record" /><br /><i>(<span class="i18_default">Default</span>: Meta F12, where Meta = Ctrl/Cmd)</i></td></tr>
-						<tr class="hide" id="paranoidhotkeyrow"><td><label for="paranoidhotkey" class="i18_toggle_paranoidhotkey">Paranoid Hotkey</label></td><td><input type="text" id="paranoidhotkey" disabled /> <input id="paranoidhotkeyrecord" type="button" value="Record" class="i18_hotkey_record" /><br /><i>(<span class="i18_default">Default</span>: Alt P)</i></td></tr>
-						<tr><td><label for="enableStickiness" class="i18_stickiness">Enable Stickiness</label></td><td><input type="checkbox" id="enableStickiness" /> <i>(<span class="i18_default">Default</span>: <span class="i18_disabled">disabled</span>; <span class="i18_stickiness2">new tabs from cloaked pages are cloaked</span>)</i></td></tr>
-						<tr><td><label for="showContext" class="i18_showcontext">Show Context Menu</label></td><td><input type="checkbox" id="showContext" /> <i>(<span class="i18_default">Default</span>: <span class="i18_enabled">enabled</span>; <span class="i18_showcontext2">show right-click item for links/images</span>)</i></td></tr>
-						<tr><td><label for="showIcon" class="i18_showicon">Show DP Icon</label></td><td><input type="checkbox" id="showIcon" /> <i>(<span class="i18_default">Default</span>: <span class="i18_enabled">enabled</span>; <span class="i18_showicon2">show icon in address bar</span>)</i></td></tr>
-						<tr class="discreeticonrow hide"><td><label for="iconType" class="i18_showicon_type">Icon</label></td><td><select id="iconType">
-							<option value="coffee">Coffee Cup</option>
-							<option value="coffee-grey">Coffee Cup (grey)</option>
-							<option value="add-item">Add Item</option>
-							<option value="addressbook">Address Book</option>
-							<option value="agent">Agent</option>
-							<option value="apple">Apple</option>
-							<option value="arrow-round">Arrow</option>
-							<option value="badge">Badge</option>
-							<option value="bar-chart">Bar Chart</option>
-							<option value="battery">Battery</option>
-							<option value="bin">Bin</option>
-							<option value="bird">Bird</option>
-							<option value="boat">Boat</option>
-							<option value="bookmark">Bookmark</option>
-							<option value="briefcase">Briefcase</option>
-							<option value="calculator">Calculator</option>
-							<option value="calendar">Calendar</option>
-							<option value="cassette">Cassette</option>
-							<option value="chain">Chain</option>
-							<option value="chat-filled">Chat (filled)</option>
-							<option value="chat-outline">Chat (outline)</option>
-							<option value="cloud-filled">Cloud (filled)</option>
-							<option value="cloud-outline">Cloud (outline)</option>
-							<option value="computer">Computer</option>
-							<option value="configuration">Configuration</option>
-							<option value="connected">Connected</option>
-							<option value="connections">Connections</option>
-							<option value="container">Container</option>
-							<option value="copy-item">Copy Item</option>
-							<option value="database">Database</option>
-							<option value="delete-item">Delete Item</option>
-							<option value="disc">Disc</option>
-							<option value="dollar">Dollar</option>
-							<option value="download">Download</option>
-							<option value="edit">Edit</option>
-							<option value="email">Email</option>
-							<option value="fan">Fan</option>
-							<option value="fancy-globe">Fancy Globe</option>
-							<option value="female-user">Female User</option>
-							<option value="fire">Fire</option>
-							<option value="first-aid">First Aid</option>
-							<option value="flag">Flag</option>
-							<option value="flower">Flower</option>
-							<option value="full-screen">Full Screen</option>
-							<option value="gears">Gears</option>
-							<option value="glasses">Glasses</option>
-							<option value="globe">Globe</option>
-							<option value="happy-face">Happy Face</option>
-							<option value="headphone">Headphone</option>
-							<option value="heart">Heart</option>
-							<option value="home">Home</option>
-							<option value="id">ID</option>
-							<option value="ipod">iPod</option>
-							<option value="lab">Lab</option>
-							<option value="lamp">Lamp</option>
-							<option value="leaves">Leaves</option>
-							<option value="lightning">Lightning</option>
-							<option value="line-globe">Line Globe</option>
-							<option value="line-graph">Line Graph</option>
-							<option value="lock">Lock</option>
-							<option value="lookup">Lookup</option>
-							<option value="male-user">Male User</option>
-							<option value="microphone">Microphone</option>
-							<option value="mobile">Mobile</option>
-							<option value="mouse">Mouse</option>
-							<option value="multi-user">Multi User</option>
-							<option value="music-note">Music Note</option>
-							<option value="network-pc">Network PC</option>
-							<option value="network">Network</option>
-							<option value="next-item">Next Item</option>
-							<option value="phone">Phone</option>
-							<option value="pie-chart">Pie Chart</option>
-							<option value="pin">Pin</option>
-							<option value="plane">Plane</option>
-							<option value="power">Power</option>
-							<option value="print">Print</option>
-							<option value="processing">Processing</option>
-							<option value="push-pin">Push Pin</option>
-							<option value="reload">Reload</option>
-							<option value="rss">RSS</option>
-							<option value="satellite">Satellite</option>
-							<option value="save">Save</option>
-							<option value="scale">Scale</option>
-							<option value="scissors">Scissors</option>
-							<option value="screen">Screen</option>
-							<option value="search">Search</option>
-							<option value="shield">Shield</option>
-							<option value="star">Star</option>
-							<option value="tablet">Tablet</option>
-							<option value="tag">Tag</option>
-							<option value="tap">Tap</option>
-							<option value="tree">Tree</option>
-							<option value="umbrella">Umbrella</option>
-							<option value="unlock">Unlock</option>
-							<option value="usb">USB</option>
-							<option value="van">Van</option>
-							<option value="wifi">WiFi</option>
-							<option value="world">World</option>
-						</select> <i>(<span class="i18_default">Default</span>: Coffee Cup; <span class="i18_showicon_type2">icon to show in address bar</span>)</i><br /><br /><img src="../img/addressicon/coffee.png" id="sampleicon" /></td></tr>
-						<tr class="discreeticonrow hide"><td><label for="iconTitle" class="i18_showicon_title">Icon Title</label></td><td><input type="text" id="iconTitle" /> <i>(<span class="i18_default">Default</span>: Decreased Productivity)</i></td></tr>
-						<tr><td><label for="showUpdateNotifications" class="i18_showupdate">Show Update Popup</label></td><td><input type="checkbox" id="showUpdateNotifications" /> <i>(<span class="i18_default">Default</span>: <span class="i18_enabled">enabled</span>; <span class="i18_showupdate2">show popup page when DP is updated</span>)</i></td></tr>
-					</table>
-				</td>
-				</tr>
-				</table>
-			</div>
-			<div id="cloak">
-				<table cellspacing="5" cellpadding="0" border="0">
-				<tr>
-				<td>
-					<table border="0" cellspacing="0" cellpadding="0">
-						<tr class="first"><td><label for="sfwmode" class="i18_level">Level</label></td><td><select id="sfwmode">
-							<option value="Paranoid" class="i18_paranoid">Paranoid (hide everything)</option>
-							<option value="SFW" class="i18_sfw0">SFW0 (cloak images/Flash)</option>
-							<option value="SFW1" class="i18_sfw1">SFW1 (cloak images/hide Flash)</option>
-							<option value="SFW2" class="i18_sfw2">SFW2 (cloak images only)</option>
-							<option value="NSFW" class="i18_nsfw">NSFW (show images/Flash, but change colors)</option>
-						</select> <i>(<span class="i18_default">Default</span>: SFW0)</i></td></tr>
-						<tr id="opacityrow" class="hide"><td><label for="opacity" class="i18_opacity">Image Opacity</label>:<br /><img src="../img/icon32.png" class="sampleimage" /></td><td>
-							<div id="o1"></div>
-							<input type="text" id="opacity1" size="1" /> <span class="i18_unhovered">Unhovered</span> <i>(<span class="i18_default">Default</span>: 0.05 <span class="i18_opacity2">set how transparent images should be</span>)</i>
-							<br />
-							<br />
-							<div id="o2"></div>
-							<input type="text" id="opacity2" size="1" /> <span class="i18_hovered">Hovered</span> <i>(<span class="i18_default">Default</span>: 0.5; <span class="i18_opacity2">set how transparent images should be</span>)</i>
-							<div id="collapseimageblock" class="hide"><br /><input type="checkbox" id="collapseimage" /><label for="collapseimage" class="i18_collapseimage">&nbsp;Remove whitespace taken up by hidden element(s)</label></div></td></tr>
-						<tr><td><label for="disableFavicons" class="i18_favicons">Hide Page Favicons</label></td><td><input type="checkbox" id="disableFavicons" /> <i>(<span class="i18_default">Default</span>: <span class="i18_disabled">disabled</span>)</i></td></tr>
-						<tr><td><label for="hidePageTitles" class="i18_hidetitles">Hide Page Titles</label></td><td><input type="checkbox" id="hidePageTitles" /> <i>(<span class="i18_default">Default</span>: <span class="i18_disabled">disabled</span>)</i><div id="pageTitle"><input type="text" id="pageTitleText" /> <i>(<span class="i18_default">Default</span>: Google Chrome)</i></div></td></tr>
-						<tr><td><label for="maxwidth" class="i18_showimages">Show Images Within</label></td><td><input type="text" id="maxwidth" style="width: 30px;" /><i>w x</i> <input type="text" id="maxheight" style="width: 30px;" /><i>h (<span class="i18_showimages2">always show images that are within this size (disable: set to 0 x 0)</span>)</i></td></tr>
-						<tr><td><label for="showUnderline" class="i18_showunderline">Underline Links</label></td><td><input type="checkbox" id="showUnderline" /> <i>(<span class="i18_default">Default</span>: <span class="i18_enabled">enabled</span>)</i></td></tr>
-						<tr><td><label for="removeBold" class="i18_removebold">Unbold Text</label></td><td><input type="checkbox" id="removeBold" /> <i>(<span class="i18_default">Default</span>: <span class="i18_disabled">disabled</span>)</i></td></tr>
-						<tr><td><label for="font" class="i18_font">Font</label></td><td><select id="font">
-							<option value="Arial">Arial</option>
-							<option value="Helvetica">Helvetica</option>
-							<option value="Calibri">Calibri</option>
-							<option value="Serif">Serif</option>
-							<option value="Monospace">Monospace</option>
-							<option value="-Custom-">-Custom-</option>
-							<option value="-Unchanged-">-Unchanged-</option>
-						</select> <i>(<span class="i18_default">Default</span>: Arial)</i></td></tr>
-						<tr id="customfontrow" class="hide"><td><label for="customfont" class="i18_customfont">Custom Font</label></td><td><input id="customfont" value="" /></td></tr>
-						<tr><td><label for="fontsize" class="i18_fontsize">Font Size</label></td><td><input type="number" id="fontsize" style="width: 40px" />px <i>(<span class="i18_default">Default</span>: 12px)</i></td></tr>
-						<tr><td><label for="s_preset"><span class="i18_color">Color</span> - <span class="i18_colorpresets">Presets</span></label></td><td><select id="s_preset">
-							<option value="" class="i18_colorpresetselect">-- Select a Preset --</option>
-							<option value="White - Blue" class="i18_c1">White - Blue</option>
-							<option value="White - Green" class="i18_c10">White - Green</option>
-							<option value="White - Gray" class="i18_c2">White - Gray</option>
-							<option value="Gray - Blue" class="i18_c3">Gray - Blue</option>
-							<option value="Light Red - Pale Blue" class="i18_c4">Light Red - Pale Blue</option>
-							<option value="Dark Brown - Off-White" class="i18_c5">Dark Brown - Off-White</option>
-							<option value="Black - Blue" class="i18_c6">Black - Blue</option>
-							<option value="Black - Green" class="i18_c7">Black - Green</option>
-							<option value="Black - Red" class="i18_c8">Black - Red</option>
-							<option value="Black - Pink" class="i18_c9">Black - Pink</option>
-						</select></td></tr>
-						<tr><td><label for="s_bg"><span class="i18_color">Color</span> - <span class="i18_colorbackground">Background</span></label></td><td><input class="mousetrap" id="s_bg" maxlength="6" value="" /></td></tr>
-						<tr><td><label for="s_text"><span class="i18_color">Color</span> - <span class="i18_colortext">Text</span></label></td><td><input class="mousetrap" id="s_text" maxlength="6" value="" /></td></tr>
-						<tr><td><label for="s_link"><span class="i18_color">Color</span> - <span class="i18_colorlink">Link</span></label></td><td><input class="mousetrap" id="s_link" maxlength="6" value="" /></td></tr>
-						<tr><td><label for="s_table"><span class="i18_color">Color</span> - <span class="i18_colortable">Table Borders</span></label></td><td><input class="mousetrap" id="s_table" maxlength="6" value="" /></td></tr>
-						<tr><td><span class="i18_demo">Demo</span></td><td><div id="test">
-							<img src="../img/option/demo/favicon.png" id="demo_favicon" /><div id="demo_title"></div>
-							<div id="demo_content">
-								<h1>Page Title</h1>
-								<img src="../img/icon32.png" class="sampleimage" />
-								<br /><br />
-								<table style="border: 1px solid;"><tr><td id="t_table"><span class="i18_test1">A test link</span>: <a href="javascript:;" id="t_link"><span class="i18_test2">Link</span></a></td></tr></table>
-							</div>
-						</div></td></tr>
-						<tr><td colspan="2" align="right"><input type="button" value="Save Colours" class="i18_savecolours" /> <input type="button" value="Revert Colours" class="i18_revertcolours" /></td></tr>
-					</table>
-				</td>
-				</tr>
-				</table>
-			</div>
-			<div id="lists">
-				<table cellspacing="5" cellpadding="0" border="0">
-				<tr>
-				<td colspan="2">
-					<table border="0" cellspacing="0" cellpadding="0">
-						<tr class="first"><td colspan="2"><label for="url" class="i18_domain">Domain</label>: <input id="url" value="" class="mousetrap" /> <input type="button" value="+ Whitelist" class="i18_addwhitelist" /><input type="button" value="+ Blacklist" class="i18_addblacklist" /><ul>
-							<li><small>Domain Matching: <strong>domain.com</strong> matches domain.com and www.domain.com</small></li>
-							<li><small>Wildcard Matching: <strong>*.domain.com</strong> matches anything.domain.com (but <u>not</u> domain.com (no subdomain))</small></li>
-							<li><small>Single Character Matching: <strong>?.abc.com</strong> matches a.abc.com, b.abc.com, 2.abc.com, etc.</small></li>
-							<li><small><strong>Note:</strong> the * and ? can be placed anywhere and/or combined (e.g. ab?.com, cat*.c?)</small></li>
-						</ul><span id="listMsg"></span></td></tr>
-						<tr><td><strong class="i18_whitelist">Whitelist</strong> (<a href="javascript:;" class="i18_clear">clear</a>)<div class="list" id="whitelist"></div></td><td><strong class="i18_blacklist">Blacklist</strong> (<a href="javascript:;" class="i18_clear">clear</a>)<div class="list" id="blacklist"></div></td></tr>
-					</table>
-				</td>
-				</tr>
-				</table>
-			</div>
-			<div id="advanced">
-				<p><span id="customcssdesc"></span>:</p>
-				<p><textarea id="customcss"></textarea></p>
-			</div>
-			<div id="importexport">
-				<table cellspacing="5" cellpadding="0" border="0">
-					<tr class="first"><td><strong>Import</strong></div></td><td><strong>Export</strong> (<a href="javascript:;" id="settingsall">select all</a>)</td></tr>
-					<tr><td><textarea id="settingsimport"></textarea><br/><br /><input type="button" value="Import" id="importsettings" /></td><td><strong><textarea id="settingsexport" readonly="readonly"></textarea></strong><br/><br /><input type="button" value="Save as Text File" id="savetxt" /></td></tr>
-				</table>
-			</div>
-		</div>
-		<div class="right"><br /><input type="button" class="i18_save" value="Save" /> <input type="button" value="Close" class="i18_close" /></div>
-		<br class="clear">
-		
-	</div>
-	<form action="https://www.paypal.com/cgi-bin/webscr" method="post" style="display: inline;">
-	<input type="hidden" name="cmd" value="_s-xclick">
-	<input type="hidden" name="encrypted" value="-----BEGIN PKCS7-----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-----END PKCS7-----">
-	<input type="image" src="./img/icon48.png" border="0" name="submit" class="i18_supportimg" alt="Support Andrew!" title="Support Andrew!">
-	</form> <span class="i18_support">Support Andrew!</span><br /><br />Bitcoin: <strong>39VJ5L9Yd6WocG6r88uE7ZZnM5J2M5bW92</strong><br /><br />
-	<i style="width:937px; display:block;"><span class="i18_people">People who bought Andrew coffee</span>: Leonardo C., 朱之灏, Donald D., John B., Patrick H., Luke C., Eric G., Brian B., Daniel C., Joel D., Joseph W., David M., Rafal W., Ip L., Caillin P., Simon B., Keith T., Peter C., Gordon M., James M., Ranjan S., Philipp B., Rommel G., Todd A., Jason T., Vineet W., Adam C., Jim M., Alex U., Stanislav S., George T., Genere S., Kevin S., Jérémy P., Carlos S., Miguel L., Adrian H., Scott B., Daniel C., Mark M., Timothy D., Alexis B., Peter C., Christiaan E., Matthew L., Russell H., David D., Keith S., Elena G., Rafael V., Scott F., Paul M., Danielle F., 曾 信夫, Jon T., Barry D., Andrew H., Ma X., Frank E., Alex W., Roger S., Artem S., Wassim N., Rajat N., Vadim P., Celia D., Mikyas W., Reann M., Gabriel J., Anthony Z., Kai Cheong W., Jason T., Michael L., Maximilian B., Anton C., Koen de W., Juan de Dios Egido A., Harry P., Jaiganesh R., Mark Rafael R., Adam B., Matteo M., Zhiyi W., Joseph D., champiton</i><br />
-	<i style="width:937px; display:block;"><span class="i18_translators">People who helped translate</span>: Christoph and ljan (Deutsch), Luciano (Español), Yamaji and cignoir (Japanese), Jérémy (Français), VeryFriend (Russian), Lorenzo (Italian), Cleber (Português do Brasil), Serdar (Turkish)</i><br />
-	<i><span class="i18_help">If you can help translate or improve, please contact me</span>: <a href="mailto:andryou@gmail.com">andryou@gmail.com</a></i><br /><br />
-	<i><a href="https://twitter.com/andryou" target="_blank">Follow me (@andryou) on Twitter!</a><br /><br />
-	<i>Decreased Productivity for: <a href="https://chrome.google.com/extensions/detail/nlbpiflhmdcklcbihngeffpmoklbiooj" target="_blank">Chrome</a> / <a href="https://addons.mozilla.org/firefox/addon/decreased-productivity-andryou/" target="_blank">Firefox</a> | <a href="https://github.com/andryou/Decreased-Productivity" target="_blank">Decreased Productivity on Github</a> | <a href="updated.html" target="_blank">View DP Update Page</a></i>
-	<script type="text/javascript" src="js/options.js"></script>
-</body>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Decreased Productivity Options</title>
+    <link rel="stylesheet" href="css/options.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <img src="img/icon48.png" alt="" />
+        <div>
+          <h1>Decreased Productivity</h1>
+          <p>Discreet browsing, your way. By Andrew Y.</p>
+        </div>
+      </header>
+      <nav aria-label="Options sections">
+        <a href="#general">General</a><a href="#cloak">Cloak</a
+        ><a href="#lists">Domain lists</a><a href="#advanced">Custom CSS</a
+        ><a href="#importexport">Import / export</a>
+      </nav>
+      <p id="message" role="status" aria-live="polite">Loading settings…</p>
+      <form id="settings-form">
+        <div class="actions">
+          <button type="submit" data-i18n="save">Save</button
+          ><button type="button" id="close" data-i18n="close">Close</button>
+        </div>
+        <section id="general">
+          <h2>General</h2>
+          <p>
+            In tab mode, click the toolbar icon to cloak or uncloak the current
+            tab. Global mode toggles all tabs. Whitelisted domains are always
+            uncloaked; blacklisted domains are always cloaked.
+          </p>
+          <div class="field">
+            <label for="enable" data-i18n="enable">Enable</label>
+            <div><input id="enable" type="checkbox" /></div>
+          </div>
+          <div class="field">
+            <label for="global" data-i18n="globalmode">Global Mode</label>
+            <div><input id="global" type="checkbox" /></div>
+          </div>
+          <div class="field">
+            <label for="newPages" data-i18n="globalmode3"
+              >new tabs by default</label
+            >
+            <div>
+              <select id="newPages">
+                <option value="Uncloak">Uncloak</option>
+                <option value="Cloak">Cloak</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="enableToggle" data-i18n="toggle"
+              >Enable Key Toggling</label
+            >
+            <div><input id="enableToggle" type="checkbox" /></div>
+          </div>
+          <div class="field">
+            <label for="hotkey" data-i18n="hotkey">Hotkey Combination</label>
+            <div>
+              <input id="hotkey" type="text" /><button
+                type="button"
+                data-record="hotkey"
+              >
+                Record
+              </button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="paranoidhotkey" data-i18n="paranoidhotkey"
+              >Paranoid Hotkey</label
+            >
+            <div>
+              <input id="paranoidhotkey" type="text" /><button
+                type="button"
+                data-record="paranoidhotkey"
+              >
+                Record
+              </button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="enableStickiness" data-i18n="stickiness"
+              >Enable Stickiness</label
+            >
+            <div><input id="enableStickiness" type="checkbox" /></div>
+          </div>
+          <div class="field">
+            <label for="showContext" data-i18n="showcontext"
+              >Show Context Menu</label
+            >
+            <div><input id="showContext" type="checkbox" /></div>
+          </div>
+          <div class="field">
+            <label for="showIcon" data-i18n="showicon">Show DP Icon</label>
+            <div>
+              <input
+                id="showIcon"
+                type="checkbox"
+                disabled
+                aria-describedby="toolbar-note"
+              />
+            </div>
+          </div>
+          <div class="field">
+            <label for="iconType" data-i18n="showicon_type">Icon</label>
+            <div>
+              <select id="iconType">
+                <option value="add-item">Add Item</option>
+                <option value="addressbook">Address Book</option>
+                <option value="agent">Agent</option>
+                <option value="apple">Apple</option>
+                <option value="arrow-round">Arrow</option>
+                <option value="badge">Badge</option>
+                <option value="bar-chart">Bar Chart</option>
+                <option value="battery">Battery</option>
+                <option value="bin">Bin</option>
+                <option value="bird">Bird</option>
+                <option value="boat">Boat</option>
+                <option value="bookmark">Bookmark</option>
+                <option value="briefcase">Briefcase</option>
+                <option value="calculator">Calculator</option>
+                <option value="calendar">Calendar</option>
+                <option value="cassette">Cassette</option>
+                <option value="chain">Chain</option>
+                <option value="chat-filled">Chat (filled)</option>
+                <option value="chat-outline">Chat (outline)</option>
+                <option value="cloud-filled">Cloud (filled)</option>
+                <option value="cloud-outline">Cloud (outline)</option>
+                <option value="coffee-grey">Coffee Cup (grey)</option>
+                <option value="coffee">Coffee Cup</option>
+                <option value="computer">Computer</option>
+                <option value="configuration">Configuration</option>
+                <option value="connected">Connected</option>
+                <option value="connections">Connections</option>
+                <option value="container">Container</option>
+                <option value="copy-item">Copy Item</option>
+                <option value="database">Database</option>
+                <option value="delete-item">Delete Item</option>
+                <option value="disc">Disc</option>
+                <option value="dollar">Dollar</option>
+                <option value="download">Download</option>
+                <option value="edit">Edit</option>
+                <option value="email">Email</option>
+                <option value="fan">Fan</option>
+                <option value="fancy-globe">Fancy Globe</option>
+                <option value="female-user">Female User</option>
+                <option value="fire">Fire</option>
+                <option value="first-aid">First Aid</option>
+                <option value="flag">Flag</option>
+                <option value="flower">Flower</option>
+                <option value="full-screen">Full Screen</option>
+                <option value="gears">Gears</option>
+                <option value="glasses">Glasses</option>
+                <option value="globe">Globe</option>
+                <option value="happy-face">Happy Face</option>
+                <option value="headphone">Headphone</option>
+                <option value="heart">Heart</option>
+                <option value="home">Home</option>
+                <option value="id">ID</option>
+                <option value="ipod">iPod</option>
+                <option value="lab">Lab</option>
+                <option value="lamp">Lamp</option>
+                <option value="leaves">Leaves</option>
+                <option value="lightning">Lightning</option>
+                <option value="line-globe">Line Globe</option>
+                <option value="line-graph">Line Graph</option>
+                <option value="lock">Lock</option>
+                <option value="lookup">Lookup</option>
+                <option value="male-user">Male User</option>
+                <option value="microphone">Microphone</option>
+                <option value="mobile">Mobile</option>
+                <option value="mouse">Mouse</option>
+                <option value="multi-user">Multi User</option>
+                <option value="music-note">Music Note</option>
+                <option value="network-pc">Network PC</option>
+                <option value="network">Network</option>
+                <option value="next-item">Next Item</option>
+                <option value="phone">Phone</option>
+                <option value="pie-chart">Pie Chart</option>
+                <option value="pin">Pin</option>
+                <option value="plane">Plane</option>
+                <option value="power">Power</option>
+                <option value="print">Print</option>
+                <option value="processing">Processing</option>
+                <option value="push-pin">Push Pin</option>
+                <option value="reload">Reload</option>
+                <option value="rss">RSS</option>
+                <option value="satellite">Satellite</option>
+                <option value="save">Save</option>
+                <option value="scale">Scale</option>
+                <option value="scissors">Scissors</option>
+                <option value="screen">Screen</option>
+                <option value="search">Search</option>
+                <option value="shield">Shield</option>
+                <option value="star">Star</option>
+                <option value="tablet">Tablet</option>
+                <option value="tag">Tag</option>
+                <option value="tap">Tap</option>
+                <option value="tree">Tree</option>
+                <option value="umbrella">Umbrella</option>
+                <option value="unlock">Unlock</option>
+                <option value="usb">USB</option>
+                <option value="van">Van</option>
+                <option value="wifi">WiFi</option>
+                <option value="world">World</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="iconTitle" data-i18n="showicon_title">Icon Title</label>
+            <div><input id="iconTitle" type="text" /></div>
+          </div>
+          <div class="field">
+            <label for="showUpdateNotifications" data-i18n="showupdate"
+              >Show Update Popup</label
+            >
+            <div><input id="showUpdateNotifications" type="checkbox" /></div>
+          </div>
+          <p class="hint" id="toolbar-note">
+            Browsers control toolbar visibility: pin or unpin DP using the
+            browser’s extensions menu. “Show DP Icon” is retained for imported
+            settings. Shortcuts run on web pages and skip text fields. Use CMD
+            for macOS Command.
+          </p>
+        </section>
+        <section id="cloak">
+          <h2>Cloak</h2>
+          <p id="color-help">
+            Colors accept 3 or 6 hex digits, without #. Set both image
+            dimensions to zero to disable the small-image exception.
+          </p>
+          <div class="field">
+            <label for="sfwmode" data-i18n="level">Level</label>
+            <div>
+              <select id="sfwmode">
+                <option value="Paranoid">
+                  Paranoid — hide images and multimedia
+                </option>
+                <option value="SFW">SFW0 — fade images and multimedia</option>
+                <option value="SFW1">
+                  SFW1 — fade images, hide multimedia
+                </option>
+                <option value="SFW2">SFW2 — fade images only</option>
+                <option value="NSFW">NSFW — show all media</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="opacity1" data-i18n="unhovered">Unhovered</label>
+            <div>
+              <input id="opacity1" type="number" min="0" max="1" step="any" />
+            </div>
+          </div>
+          <div class="field">
+            <label for="opacity2" data-i18n="hovered">Hovered</label>
+            <div>
+              <input id="opacity2" type="number" min="0" max="1" step="any" />
+            </div>
+          </div>
+          <div class="field">
+            <label for="collapseimage" data-i18n="collapseimage"
+              >Remove whitespace taken up by hidden element(s)</label
+            >
+            <div><input id="collapseimage" type="checkbox" /></div>
+          </div>
+          <div class="field">
+            <label for="maxwidth" data-i18n="showimages"
+              >Show Images Within</label
+            >
+            <div>
+              <input
+                id="maxwidth"
+                type="number"
+                min="0"
+                max="10000"
+                step="any"
+              />
+            </div>
+          </div>
+          <div class="field">
+            <label for="maxheight">Height</label>
+            <div>
+              <input
+                id="maxheight"
+                type="number"
+                min="0"
+                max="10000"
+                step="any"
+              />
+            </div>
+          </div>
+          <div class="field">
+            <label for="disableFavicons" data-i18n="favicons"
+              >Hide Page Favicons</label
+            >
+            <div><input id="disableFavicons" type="checkbox" /></div>
+          </div>
+          <div class="field">
+            <label for="hidePageTitles" data-i18n="hidetitles"
+              >Hide Page Titles</label
+            >
+            <div><input id="hidePageTitles" type="checkbox" /></div>
+          </div>
+          <div class="field">
+            <label for="pageTitleText">Page title replacement</label>
+            <div><input id="pageTitleText" type="text" /></div>
+          </div>
+          <div class="field">
+            <label for="font" data-i18n="font">Font</label>
+            <div>
+              <select id="font">
+                <option value="Arial">Arial</option>
+                <option value="Calibri">Calibri</option>
+                <option value="Helvetica">Helvetica</option>
+                <option value="Serif">Serif</option>
+                <option value="Monospace">Monospace</option>
+                <option value="-Unchanged-">-Unchanged-</option>
+                <option value="-Custom-">-Custom-</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="customfont" data-i18n="customfont">Custom Font</label>
+            <div><input id="customfont" type="text" /></div>
+          </div>
+          <div class="field">
+            <label for="fontsize" data-i18n="fontsize">Font Size</label>
+            <div>
+              <input id="fontsize" type="number" min="1" max="200" step="any" />
+            </div>
+          </div>
+          <div class="field">
+            <label for="showUnderline" data-i18n="showunderline"
+              >Underline Links</label
+            >
+            <div><input id="showUnderline" type="checkbox" /></div>
+          </div>
+          <div class="field">
+            <label for="removeBold" data-i18n="removebold">Unbold Text</label>
+            <div><input id="removeBold" type="checkbox" /></div>
+          </div>
+          <div class="field">
+            <label for="s_bg" data-i18n="colorbackground">Background</label>
+            <div>
+              <input
+                id="s_bg"
+                type="text"
+                maxlength="6"
+                pattern="([0-9a-fA-F]{3}|[0-9a-fA-F]{6})"
+                aria-describedby="color-help"
+              />
+            </div>
+          </div>
+          <div class="field">
+            <label for="s_text" data-i18n="colortext">Text</label>
+            <div>
+              <input
+                id="s_text"
+                type="text"
+                maxlength="6"
+                pattern="([0-9a-fA-F]{3}|[0-9a-fA-F]{6})"
+                aria-describedby="color-help"
+              />
+            </div>
+          </div>
+          <div class="field">
+            <label for="s_link" data-i18n="colorlink">Link</label>
+            <div>
+              <input
+                id="s_link"
+                type="text"
+                maxlength="6"
+                pattern="([0-9a-fA-F]{3}|[0-9a-fA-F]{6})"
+                aria-describedby="color-help"
+              />
+            </div>
+          </div>
+          <div class="field">
+            <label for="s_table" data-i18n="colortable">Table Borders</label>
+            <div>
+              <input
+                id="s_table"
+                type="text"
+                maxlength="6"
+                pattern="([0-9a-fA-F]{3}|[0-9a-fA-F]{6})"
+                aria-describedby="color-help"
+              />
+            </div>
+          </div>
+          <div class="field">
+            <label for="preset">Color preset</label
+            ><select id="preset">
+              <option value="">Choose a preset</option>
+              <option value="white-blue">White / blue</option>
+              <option value="white-gray">White / gray</option>
+              <option value="white-green">White / green</option>
+              <option value="gray-blue">Gray / blue</option>
+              <option value="red-blue">Light red / pale blue</option>
+              <option value="brown">Dark brown / off-white</option>
+              <option value="black-blue">Black / blue</option>
+              <option value="black-green">Black / green</option>
+              <option value="black-red">Black / red</option>
+              <option value="black-pink">Black / pink</option>
+            </select>
+          </div>
+          <div id="preview" aria-label="Cloak preview">
+            <h3>Preview page title</h3>
+            <p>Sample text and <a href="#cloak">a link</a>.</p>
+            <img src="img/icon48.png" alt="Sample image" />
+          </div>
+        </section>
+        <section id="lists">
+          <h2>Domain lists</h2>
+          <p>
+            Entries match the whole hostname: example.com also matches
+            www.example.com. *.example.com matches subdomains; ? matches one
+            character. A whitelist takes precedence.
+          </p>
+          <div class="domain-entry">
+            <label for="domain">Domain</label
+            ><input id="domain" placeholder="example.com" /><button
+              type="button"
+              data-domain="whitelist"
+            >
+              + Whitelist</button
+            ><button type="button" data-domain="blacklist">+ Blacklist</button>
+          </div>
+          <div class="lists">
+            <div>
+              <h3 data-i18n="whitelist">Whitelist</h3>
+              <ul id="whiteList"></ul>
+              <button type="button" data-clear="whiteList">
+                Clear whitelist
+              </button>
+            </div>
+            <div>
+              <h3 data-i18n="blacklist">Blacklist</h3>
+              <ul id="blackList"></ul>
+              <button type="button" data-clear="blackList">
+                Clear blacklist
+              </button>
+            </div>
+          </div>
+        </section>
+        <section id="advanced">
+          <h2>Custom CSS</h2>
+          <label for="customcss" data-i18n="customcss"
+            >Enter custom CSS code to be applied to all websites (advanced
+            users)</label
+          ><textarea id="customcss" spellcheck="false"></textarea>
+        </section>
+        <div class="actions">
+          <button type="submit" data-i18n="save">Save</button>
+        </div>
+      </form>
+      <section id="importexport">
+        <h2>Import / export settings</h2>
+        <p>
+          Import a JSON export or a legacy setting|value text export. Import
+          validates the entire file before saving.
+        </p>
+        <div class="lists">
+          <div>
+            <label for="settingsimport">Import</label
+            ><textarea id="settingsimport" spellcheck="false"></textarea
+            ><button id="importsettings">Import</button>
+          </div>
+          <div>
+            <label for="settingsexport">Export</label
+            ><textarea id="settingsexport" readonly></textarea
+            ><button id="savetxt">Download JSON</button>
+          </div>
+        </div>
+      </section>
+      <footer>
+        <a
+          href="https://github.com/dchocoboo/decreased-productivity"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Source and support</a
+        >
+        · Settings stay in this browser. No analytics or remote code.
+      </footer>
+    </main>
+    <script src="js/settings.js"></script>
+    <script src="js/options.js"></script>
+  </body>
 </html>
